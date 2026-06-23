@@ -1,6 +1,6 @@
 # Cloud Factory Demo
 
-This repository describes a simple cloud factory: a set of agent skills and workflows for moving work from incoming issue to verified change.
+This repository is the canonical source for a simple cloud factory: a set of agent skills and GitHub Actions workflows for moving work from an incoming issue to a verified change.
 
 The factory is organized around six stages:
 
@@ -10,6 +10,32 @@ The factory is organized around six stages:
 - **Code review** — review pull requests for correctness, maintainability, security, and alignment with the issue or spec.
 - **Verification** — confirm the merged or proposed change satisfies the original request and passes the required checks.
 - **Monitoring** — watch outcomes after changes land, surface regressions, and feed new findings back into triage.
+
+## Included skills
+
+- `.agents/skills/Triage/SKILL.md` — triages issue-tracker issues and applies exactly one implementation-readiness label.
+- `.agents/skills/implementation/SKILL.md` — implements a ready issue, validates the change, opens a PR, and reports progress back to the original issue.
+
+## Included GitHub Actions workflows
+
+- `.github/workflows/triage-issues.yml` — runs Oz triage when a new GitHub issue is opened.
+- `.github/workflows/implement-ready-issues.yml` — runs Oz implementation when an issue receives a `Ready to implement` label.
+
+## Installing into another repository
+
+Consumers can install the skills from this canonical repo with the skills CLI:
+
+```bash
+npx skills install warpdotdev-demos/cloud-factory-demo --skill Triage --skill implementation --agent warp --yes
+```
+
+If your `skills` CLI version uses `add` instead of `install`, use:
+
+```bash
+npx skills add warpdotdev-demos/cloud-factory-demo --skill Triage --skill implementation --agent warp --yes
+```
+
+Workflow templates can be copied from `.github/workflows/` into the consuming repository. The workflows expect a `WARP_API_KEY` GitHub Actions secret.
 
 ## Default implementation
 

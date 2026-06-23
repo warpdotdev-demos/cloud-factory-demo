@@ -1,0 +1,23 @@
+{
+  "skill_name": "Triage",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Triage GitHub issue #8 for this repository and apply the appropriate readiness label.",
+      "expected_output": "Fetches the issue and available labels, inspects the current checkout and related open issues, chooses exactly one readiness state, applies the matching tracker label, and reports the rationale.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "Please triage ENG-142 from Jira. Decide whether an agent should implement it now, spec it first, ask for more details, or wait.",
+      "expected_output": "Uses an available Jira integration to fetch the full issue and labels, analyzes relevant code and open issues, applies exactly one semantically matching readiness label, and reports concrete next steps.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Assess this Linear issue for implementation readiness: https://linear.app/example/issue/APP-321/new-image-export-flow",
+      "expected_output": "Fetches Linear issue context and existing labels, evaluates product cohesion and implementation ambiguity against the codebase, applies exactly one readiness label, and summarizes the evidence.",
+      "files": []
+    }
+  ]
+}
