@@ -18,24 +18,34 @@ The factory is organized around six stages:
 
 ## Included GitHub Actions workflows
 
-- `.github/workflows/triage-issues.yml` — runs Oz triage when a new GitHub issue is opened.
-- `.github/workflows/implement-ready-issues.yml` — runs Oz implementation when an issue receives a `Ready to implement` label.
+This repo keeps workflow templates in `templates/github/workflows/` so they can be copied into consuming repositories:
+
+- `templates/github/workflows/triage-issues.yml` — runs Oz triage when a new GitHub issue is opened.
+- `templates/github/workflows/implement-ready-issues.yml` — runs Oz implementation when an issue receives a `Ready to implement` label.
+
+The `.github/workflows/` directory contains the same workflows for this repo to exercise and document the templates.
 
 ## Installing into another repository
 
-Consumers can install the skills from this canonical repo with the skills CLI:
+From the root of a consuming repository, run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/scripts/install-cloud-factory.sh | bash
+```
+
+The installer:
+
+1. Installs the `Triage` and `implementation` skills from this canonical repo with `npx skills install`.
+2. Falls back to `npx skills add` for CLI versions that use `add` instead of `install`.
+3. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
+
+The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
+
+If you only want to install the skills without copying workflows, run:
 
 ```bash
 npx skills install warpdotdev-demos/cloud-factory-demo --skill Triage --skill implementation --agent warp --yes
 ```
-
-If your `skills` CLI version uses `add` instead of `install`, use:
-
-```bash
-npx skills add warpdotdev-demos/cloud-factory-demo --skill Triage --skill implementation --agent warp --yes
-```
-
-Workflow templates can be copied from `.github/workflows/` into the consuming repository. The workflows expect a `WARP_API_KEY` GitHub Actions secret.
 
 ## Default implementation
 
