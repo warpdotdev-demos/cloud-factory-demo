@@ -13,8 +13,9 @@ The factory is organized around six stages:
 
 ## Included skills
 
-- `.agents/skills/Triage/SKILL.md` — triages issue-tracker issues and applies exactly one implementation-readiness label.
+- `.agents/skills/triage/SKILL.md` — triages issue-tracker issues and applies exactly one implementation-readiness label.
 - `.agents/skills/implementation/SKILL.md` — implements a ready issue, validates the change, opens a PR, and reports progress back to the original issue.
+- `.agents/skills/oz-cloud-factory-demo/SKILL.md` — walks a user who is new to Oz through installing, configuring, activating, and testing the triage-to-implementation factory in a repository of their choice.
 
 ## Included GitHub Actions workflows
 
@@ -35,17 +36,24 @@ curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo
 
 The installer:
 
-1. Installs the `Triage` and `implementation` skills from this canonical repo with `npx skills install`.
-2. Falls back to `npx skills add` for CLI versions that use `add` instead of `install`.
-3. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
+1. Installs the `triage` and `implementation` skills from this canonical repo with `npx skills add`.
+2. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
 
 The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
 
 If you only want to install the skills without copying workflows, run:
 
 ```bash
-npx skills install warpdotdev-demos/cloud-factory-demo --skill Triage --skill implementation --agent warp --yes
+npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill implementation --agent warp --yes
 ```
+
+To install the guided setup skill, run:
+
+```bash
+npx skills add warpdotdev-demos/cloud-factory-demo --skill oz-cloud-factory-demo --agent warp --yes
+```
+
+Then invoke `oz-cloud-factory-demo` with a GitHub repository URL, `owner/repo`, or local checkout path. It explains each step, uses the installer above, configures Oz authentication safely, and walks through billable test-run checkpoints before activating automation.
 
 ## Default implementation
 

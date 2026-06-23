@@ -17,8 +17,7 @@ if ! command -v npx >/dev/null 2>&1; then
   exit 1
 fi
 
-npx skills install "${REPO}" --skill Triage --skill implementation --agent warp --yes \
-  || npx skills add "${REPO}" --skill Triage --skill implementation --agent warp --yes
+npx skills add "${REPO}" --skill triage --skill implementation --agent warp --yes
 
 mkdir -p .github/workflows
 curl -fsSL "${RAW_BASE}/templates/github/workflows/triage-issues.yml" -o .github/workflows/triage-issues.yml
