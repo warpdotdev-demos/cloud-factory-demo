@@ -39,7 +39,7 @@ jobs:
           prompt: |
             Use the Implementation skill in this repository to implement the GitHub issue that was just labeled ready to implement.
 
-            First read `.agents/skills/implementation.md`, then follow it exactly.
+            First read `.agents/skills/implementation/SKILL.md`, then follow it exactly.
 
             - Repository: ${{ github.repository }}
             - Issue number: #${{ github.event.issue.number }}
