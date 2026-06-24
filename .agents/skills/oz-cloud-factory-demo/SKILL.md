@@ -32,7 +32,6 @@ The setup is complete when:
 - **GitHub Actions** provides the event triggers and repository checkout for this demo.
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
 - **Implementation** runs only when the issue receives a ready-to-implement label.
-- The GitHub workflows use the repository checkout created by GitHub Actions. A separately configured Oz cloud environment is useful for manual Oz runs, but does not control these `oz-agent-action` workflows.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
 ## Workflow
@@ -65,6 +64,42 @@ If the user is testing installation from a clean state, verify both the local ch
 Before changing anything, show the user the flow, explain that automated runs consume credits, and ask whether they want to proceed with installation.
 
 ### 2. Check prerequisites
+#### Install or verify the Oz CLI
+
+First determine whether the user is running the setup from Warp or another terminal.
+
+If the user is running in Warp, explain that the Oz CLI is bundled with the Warp app and should already be available. Verify it rather than reinstalling it:
+
+```sh
+command -v oz
+oz --version
+```
+
+If `oz` is not available in Warp, have the user open the Command Palette, search for **Install Oz CLI Command**, and run that action. Then verify `oz --version` again.
+
+If the user is not running in Warp:
+
+- On macOS, favor the supported Homebrew installation:
+
+  ```sh
+  brew tap warpdotdev/warp
+  brew update
+  brew install --cask oz
+  ```
+
+- On Linux, use Warp's supported package repository for the distribution and install `oz-stable` with `apt`, `yum`, or `pacman`.
+- On Windows, install the Warp app because a standalone Oz CLI package is not currently available.
+
+After installation, verify:
+
+```sh
+command -v oz
+oz --version
+```
+
+Do not continue until both commands succeed. Use the stable `oz` command, not `oz-preview`, unless the user explicitly asks to use Preview.
+
+#### Verify the remaining prerequisites
 
 Verify these commands are available:
 
@@ -72,9 +107,24 @@ Verify these commands are available:
 - `gh`
 - `node` and `npx`
 - `curl`
-- `oz`
 
 Confirm the user is logged in with `oz whoami`. If not, run `oz login` and let the user complete the interactive login.
+
+#### Create and enable a Warp team when needed
+
+Use `oz whoami` to determine whether the user belongs to the intended Warp team. If they do not have a Warp team, guide them through this setup before continuing:
+
+1. Open Warp and go to **Settings > Teams**.
+2. Follow the prompts to create a team and give it a meaningful organization or project name. The creator becomes the team admin.
+3. Optionally copy the invite link from **Settings > Teams** and share it with teammates through a secure channel.
+4. Have the team admin confirm the team is on a plan that supports cloud agents and Add-on Credits, and that at least 20 credits are available. Do not start automated runs until billing and credit availability are understood.
+5. Have a GitHub organization admin install the [Oz by Warp GitHub App](https://github.com/apps/oz-by-warp) and grant it access to the target repository.
+6. In Warp, have a team admin go to **Settings > Admin Panel > Platform** and add the GitHub organization under **Enabled GitHub Orgs**. This enables team API-key runs to clone the repository, push branches, and open pull requests.
+7. Run `oz whoami` again and verify it shows the intended team before creating team-scoped keys.
+
+A Warp user can belong to only one team at a time. If the user already belongs to a different team, do not create another or switch teams without explaining the impact and receiving explicit approval.
+
+Treat Oz as enabled for this Cloud Factory only after the team exists, the supported plan and credits are confirmed, the Oz by Warp GitHub App can access the repository, the GitHub organization is enabled in the Admin Panel, and `oz whoami` shows the intended team.
 
 Confirm:
 
@@ -144,37 +194,13 @@ Never print, read back, commit, or write the key to a repository file. Confirm o
 
 An optional `WARP_AGENT_PROFILE` repository variable may select a preconfigured team Oz Agent Profile. Do not create or set it to a personal profile.
 
-### 5. Optionally create a team repo-aware Oz environment
-
-Explain that this environment is for manual smoke tests and future direct Oz runs; it is not used by the GitHub Actions workflows installed above.
-
-List existing environments with `oz environment list`. Reuse an environment only if it is team-scoped, targets `TARGET_REPO`, and has the repository's required toolchain. Never reuse or create a personal environment for this setup.
-
-If a new environment is useful, inspect the repository's README, manifests, and CI workflows to determine:
-
-- An appropriate public Oz Docker image
-- The setup command needed after checkout
-
-Show the proposed image and setup command before creating it. Then create a team environment:
-
-```sh
-oz environment create \
-  --team \
-  --name "<repo-name> cloud factory" \
-  --repo "$TARGET_REPO" \
-  --docker-image "<image>" \
-  --setup-command "<setup-command>"
-```
-
-Do not invent a setup command. Omit it when the repository does not require one.
-
-### 6. Review and activate
+### 5. Review and activate
 
 Before activation, review:
 
 - The complete git diff
 - Workflow permissions
-- The team-scoped API key, team GitHub authorization, and any team environment or Agent Profile
+- The team-scoped API key, team GitHub authorization, and any team Agent Profile
 - GitHub Actions workflow permissions, especially whether Actions can create and approve pull requests
 - The four triage labels and routing behavior
 - Expected credit consumption
@@ -188,7 +214,7 @@ After activation, confirm both workflows appear with:
 gh workflow list --repo "$TARGET_REPO"
 ```
 
-### 7. Test triage first
+### 6. Test triage first
 
 Ask permission before creating a test issue because opening it triggers a billable cloud run.
 
@@ -205,7 +231,7 @@ If triage does not choose `Ready to implement`, do not override the label merely
 
 If triage applies `Ready to implement` but no implementation workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. GitHub does not trigger most new workflow runs from events created by `GITHUB_TOKEN`, so a label applied by the triage workflow may not fire the separate `issues.labeled` implementation workflow. For a smoke test, explain this limitation and ask before manually removing and re-adding the label as a human user. For a durable setup, recommend changing the workflow design to use a PAT or GitHub App token for label writes, dispatch the implementation workflow explicitly, or combine orchestration so implementation is not dependent on a suppressed follow-up event.
 
-### 8. Test implementation
+### 7. Test implementation
 
 Before allowing a `Ready to implement` label to trigger implementation, remind the user that this starts another billable run that may push a branch and open a PR.
 
@@ -228,12 +254,12 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 - **PR creation blocked:** Enable repository or organization Actions settings that allow GitHub Actions to create and approve pull requests, or configure a PAT/GitHub App token with pull request write permission.
 - **Skill not found:** Confirm the exact installed paths and that the triage workflow references `triage`.
 - **Implementation does not trigger:** Confirm the issue received `Ready to implement`, `ready-to-implement`, or `ready to implement`. If triage added the label from `github-actions`, account for GitHub's `GITHUB_TOKEN` event suppression.
-- **Agent cannot build the project:** Improve the repository's setup instructions or implementation skill. A separately created Oz environment will not change the GitHub Actions workflow checkout.
+- **Agent cannot build the project:** Improve the repository's setup instructions or implementation skill, or update the GitHub Actions runner setup so the required toolchain is available.
 
 ## Guardrails
 
 - Never reveal, print, or commit API keys or other secrets.
-- Never create or substitute personal Oz API keys, environments, secrets, or Agent Profiles for this setup.
+- Never create or substitute personal Oz API keys, secrets, or Agent Profiles for this setup.
 - Never activate workflows, open a test issue, trigger implementation, or push to the default branch without explaining the consequence and receiving explicit approval.
 - Never weaken repository protections or broaden workflow permissions just to make the demo pass.
 - Never force ambiguous or risky issues into `Ready to implement`.
