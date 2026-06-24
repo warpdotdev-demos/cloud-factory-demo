@@ -31,7 +31,10 @@ The `.github/workflows/` directory contains the same workflows for this repo to 
 From the root of a consuming repository, run:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/scripts/install-cloud-factory.sh | bash
+tmp_installer="$(mktemp)"
+curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/scripts/install-cloud-factory.sh -o "$tmp_installer"
+bash "$tmp_installer"
+rm "$tmp_installer"
 ```
 
 The installer:

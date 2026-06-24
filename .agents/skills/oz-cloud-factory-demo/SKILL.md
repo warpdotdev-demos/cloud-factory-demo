@@ -55,6 +55,13 @@ Resolve the target to:
 
 If no local checkout exists, ask where the user wants it cloned, then clone it with `gh repo clone`. Confirm `gh auth status` succeeds and that the user has permission to manage Actions secrets and push workflow files.
 
+If the user is testing installation from a clean state, verify both the local checkout and the remote default branch are clean:
+
+- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
+- Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues` or `Implement Ready Issues` workflows.
+- Check `gh secret list --repo "$TARGET_REPO"` for an existing `WARP_API_KEY` secret.
+- If any are present, explain that the repository is not a clean activation target. Ask whether to continue against the existing setup or create a fresh test repository.
+
 Before changing anything, show the user the flow, explain that automated runs consume credits, and ask whether they want to proceed with installation.
 
 ### 2. Check prerequisites
@@ -71,8 +78,10 @@ Confirm the user is logged in with `oz whoami`. If not, run `oz login` and let t
 
 Confirm:
 
+- `gh auth status` succeeds for the GitHub account that will create secrets, push workflow files, open issues, and inspect Actions runs.
 - GitHub Actions is enabled for the repository.
 - Issues are enabled for the repository.
+- The repository allows GitHub Actions to create and approve pull requests, or the workflow is configured to use a PAT or GitHub App token with `pull-requests: write`.
 - The user belongs to the intended Warp team and can create or request team-scoped resources.
 - The Warp team has Add-on Credits available for cloud runs.
 - Team GitHub authorization is configured for the target repository.
@@ -83,10 +92,13 @@ Explain that a run failing with `insufficient_credits` means a team admin must p
 
 From `TARGET_DIR`, inspect the existing `.agents/skills/` and `.github/workflows/` files first. If the installer would overwrite customized files, show the differences and ask before continuing.
 
-Run the canonical installer from the target repository root:
+Run the canonical installer from the target repository root. Prefer downloading it to a temporary file before running it so child commands cannot consume the rest of the script from stdin:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/scripts/install-cloud-factory.sh | bash
+tmp_installer="$(mktemp)"
+curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/scripts/install-cloud-factory.sh -o "$tmp_installer"
+bash "$tmp_installer"
+rm "$tmp_installer"
 ```
 
 The installer must add:
@@ -118,7 +130,15 @@ unset WARP_API_KEY
 
 If they need a key, have them use **Settings > Cloud platform > Oz Cloud API Keys** in Warp or the Oz web app, create a key named `cloud-factory-github-actions`, select `Team`, choose an expiration that follows the team's rotation policy, and copy its one-time value into `WARP_API_KEY` without printing it.
 
-Do not use `oz api-key create` for this setup because the public CLI command does not expose a `--team` scope option. Never fall back to a personal key. If the user cannot create a team key or configure team GitHub authorization, stop and ask a team admin to complete those steps.
+If the installed Oz CLI supports team-scoped API-key creation, it is acceptable to create the key with `oz api-key create` instead. First confirm `oz whoami` shows the intended team, then use the team-scoped form exposed by `oz api-key create --help`. When using JSON output, the one-time secret value is currently in the `raw_api_key` field. Pipe or store only that value directly into the GitHub secret.
+
+After creating a key by any method, verify metadata only, never the raw key value:
+
+```sh
+oz api-key list --output-format json
+```
+
+The key used for automation must show `scope: "Team"`. Plain `oz api-key create` may create a `Personal` key in some CLI versions; do not use that key for this setup. Never fall back to a personal key. If the user cannot create a team key or configure team GitHub authorization, stop and ask a team admin to complete those steps.
 
 Never print, read back, commit, or write the key to a repository file. Confirm only that the `WARP_API_KEY` secret name exists using `gh secret list --repo "$TARGET_REPO"`.
 
@@ -155,6 +175,7 @@ Before activation, review:
 - The complete git diff
 - Workflow permissions
 - The team-scoped API key, team GitHub authorization, and any team environment or Agent Profile
+- GitHub Actions workflow permissions, especially whether Actions can create and approve pull requests
 - The four triage labels and routing behavior
 - Expected credit consumption
 - The fact that implementation agents can push branches and open PRs
@@ -182,6 +203,8 @@ Watch the `Triage New Issues` workflow and inspect its result with `gh run list`
 
 If triage does not choose `Ready to implement`, do not override the label merely to force implementation. Explain the result and either improve the test issue with the user or create a separate clearly implementable test issue with permission.
 
+If triage applies `Ready to implement` but no implementation workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. GitHub does not trigger most new workflow runs from events created by `GITHUB_TOKEN`, so a label applied by the triage workflow may not fire the separate `issues.labeled` implementation workflow. For a smoke test, explain this limitation and ask before manually removing and re-adding the label as a human user. For a durable setup, recommend changing the workflow design to use a PAT or GitHub App token for label writes, dispatch the implementation workflow explicitly, or combine orchestration so implementation is not dependent on a suppressed follow-up event.
+
 ### 8. Test implementation
 
 Before allowing a `Ready to implement` label to trigger implementation, remind the user that this starts another billable run that may push a branch and open a PR.
@@ -202,8 +225,9 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 - **Team key cannot write to GitHub:** Confirm team GitHub authorization is configured for the target repository.
 - **`insufficient_credits`:** Direct a team admin to purchase Add-on Credits in Oz or Warp billing settings, then retry.
 - **Permission failure:** Compare the workflow's `permissions` block with the attempted action and check repository or organization Actions policy.
+- **PR creation blocked:** Enable repository or organization Actions settings that allow GitHub Actions to create and approve pull requests, or configure a PAT/GitHub App token with pull request write permission.
 - **Skill not found:** Confirm the exact installed paths and that the triage workflow references `triage`.
-- **Implementation does not trigger:** Confirm the issue received `Ready to implement`, `ready-to-implement`, or `ready to implement`.
+- **Implementation does not trigger:** Confirm the issue received `Ready to implement`, `ready-to-implement`, or `ready to implement`. If triage added the label from `github-actions`, account for GitHub's `GITHUB_TOKEN` event suppression.
 - **Agent cannot build the project:** Improve the repository's setup instructions or implementation skill. A separately created Oz environment will not change the GitHub Actions workflow checkout.
 
 ## Guardrails

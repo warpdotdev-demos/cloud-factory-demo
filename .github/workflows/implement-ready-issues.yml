@@ -1,7 +1,7 @@
 name: Implement Ready Issues
 
 # Runs an Oz cloud agent when an issue receives a ready-to-implement label.
-# The agent follows .agents/skills/implementation.md to implement the issue,
+# The agent follows .agents/skills/implementation/SKILL.md to implement the issue,
 # open a pull request, and report progress back to the original issue.
 
 on:
