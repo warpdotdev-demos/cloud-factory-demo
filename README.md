@@ -5,7 +5,7 @@ This repository is the canonical source for a simple cloud factory: a set of age
 The factory is organized around six stages:
 
 - **Triage** — classify incoming issues, determine implementation readiness, and route work to the right next step.
-- **Specking** — turn ambiguous or broad requests into product and technical specs with clear behavior, constraints, and validation criteria.
+- **Spec'ing** — turn ambiguous or broad requests into product and technical specs with clear behavior, constraints, and validation criteria.
 - **Implementation** — use the approved issue or spec context to make the code change, validate it, and open a pull request.
 - **Code review** — review pull requests for correctness, maintainability, security, and alignment with the issue or spec.
 - **Verification** — confirm the merged or proposed change satisfies the original request and passes the required checks.
