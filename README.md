@@ -60,7 +60,7 @@ Then invoke `oz-cloud-factory-demo` with a GitHub repository URL, `owner/repo`, 
 
 ## Default implementation
 
-The default implementation models each factory stage as an agent skill and runs those agents on the Oz platform. In that setup, issue tracker events, labels, pull requests, and other repository signals can trigger Oz cloud agents to perform the appropriate stage of work and write progress back to the source system.
+The default implementation models each factory stage as an agent skill and runs those agents on the Oz platform (https://docs.warp.dev/agent-platform/cloud-agents/overview/). In that setup, issue tracker events, labels, pull requests, and other repository signals can trigger Oz cloud agents to perform the appropriate stage of work and write progress back to the source system.
 
 ## Portable design
 
