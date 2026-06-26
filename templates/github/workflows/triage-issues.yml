@@ -1,12 +1,12 @@
 name: Triage New Issues
 
-# Runs an Oz cloud agent with the repo's "triage" skill whenever a new issue is opened.
+# Triages a newly opened issue with an Oz cloud agent.
 #
-# Setup:
-#   - The WARP_API_KEY repository secret must be set (the Oz API key).
-#     It is sourced locally from the gitignored .oz-api-key file.
-#   - The triage skill lives at .agents/skills/triage/ and is resolved by the
-#     action's `skill` input below.
+# The agent runs read-only (issues: read) and emits a structured JSON result;
+# the separate `apply` job (issues: write) applies the label and comment to the
+# triggering issue only.
+#
+# Setup: the WARP_API_KEY repository secret must be set (the Oz API key).
 
 on:
   issues:
@@ -22,8 +22,10 @@ jobs:
     name: Triage issue
     runs-on: ubuntu-latest
     permissions:
-      contents: read   # let the agent inspect the checked-out codebase
-      issues: write     # let the agent apply labels and comment
+      contents: read # let the agent inspect the checked-out codebase
+      issues: read # let the agent read the issue/comments/labels — never write
+    outputs:
+      triage_result: ${{ steps.triage.outputs.agent_output }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,29 +34,109 @@ jobs:
         uses: warpdotdev/oz-agent-action@v1
         id: triage
         env:
-          # Authenticates the `gh` CLI the agent uses to read/label/comment.
           GH_TOKEN: ${{ github.token }}
         with:
-          # Uses .agents/skills/triage/SKILL.md as the base prompt.
           skill: triage
           name: "Triage issue #${{ github.event.issue.number }}"
-          # Only inject GitHub-generated, non-freeform values to avoid prompt
-          # injection; the agent fetches title/body/comments itself via `gh`.
           prompt: |
-            Triage the GitHub issue that was just opened in this repository.
+            Triage GitHub issue #${{ github.event.issue.number }} in this
+            repository using the triage skill.
 
             - Repository: ${{ github.repository }}
-            - Issue number: #${{ github.event.issue.number }}
             - Issue URL: ${{ github.event.issue.html_url }}
 
-            Follow the triage skill: use the `gh` CLI to fetch the full issue
-            (title, body, comments, existing labels) and related open issues,
-            inspect this checked-out codebase, then choose exactly one
-            implementation-readiness state and apply the matching label.
-            Post status comments as directed by the triage skill, using only an
-            Oz run or Oz session URL as the follow-along link. Do not use the
-            GitHub Actions workflow URL as the follow-along link. After labeling,
-            post your triage result as a comment on the issue using
-            `gh issue comment #${{ github.event.issue.number }}`.
+            Return the JSON result the skill specifies as your final response;
+            the apply job applies the label and comment from it.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+
+  apply:
+    name: Apply triage result
+    needs: triage
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Apply label and comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          TRIAGE_RESULT: ${{ needs.triage.outputs.triage_result }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TRIAGE_RESULT:-}" ]; then
+            echo "::error::Triage job produced no output; nothing to apply." >&2
+            exit 1
+          fi
+
+          # The action returns the agent's full final response, which may
+          # include prose around the JSON. Extract the last triage-result
+          # object (the one carrying "state"/"label") into triage_result.json.
+          printf '%s' "$TRIAGE_RESULT" > raw_output.txt
+          if ! python3 - raw_output.txt > triage_result.json <<'PY'
+          import json, sys
+
+          text = open(sys.argv[1], encoding="utf-8").read()
+          decoder = json.JSONDecoder()
+          last_obj = last_triage = None
+          for i, ch in enumerate(text):
+              if ch != "{":
+                  continue
+              try:
+                  obj, _ = decoder.raw_decode(text[i:])
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(obj, dict):
+                  last_obj = obj
+                  if "state" in obj and "label" in obj:
+                      last_triage = obj
+          result = last_triage if last_triage is not None else last_obj
+          if result is None:
+              sys.exit(1)
+          json.dump(result, sys.stdout)
+          PY
+          then
+            echo "::error::Could not find a JSON object in the agent output. Raw output:" >&2
+            cat raw_output.txt >&2
+            exit 1
+          fi
+
+          STATE="$(jq -r '.state // ""' triage_result.json)"
+          LABEL="$(jq -r '.label // ""' triage_result.json)"
+
+          # Require the structured fields the apply step needs. The set of valid
+          # states/labels is owned by the triage skill, so it is intentionally
+          # not duplicated here.
+          if [ -z "$STATE" ]; then
+            echo "::error::Triage result is missing a 'state'." >&2
+            exit 1
+          fi
+
+          if [ -z "$LABEL" ]; then
+            echo "::error::Triage result is missing a 'label' to apply." >&2
+            exit 1
+          fi
+
+          echo "Triage state: $STATE"
+          echo "Applying label: $LABEL"
+
+          # Remove any superseded triage-state labels the agent listed. Failures
+          # (e.g. a label that is not present) are non-fatal.
+          while IFS= read -r remove_label; do
+            [ -z "$remove_label" ] && continue
+            echo "Removing label: $remove_label"
+            gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "$remove_label" || true
+          done < <(jq -r '(.remove_labels // [])[]' triage_result.json)
+
+          # Apply the chosen triage-state label to the triggering issue only.
+          gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "$LABEL"
+
+          jq -r '.comment // ""' triage_result.json > comment.md
+          if [ -s comment.md ]; then
+            printf '\n\n---\n_Powered by [Oz](https://warp.dev/oz)_\n' >> comment.md
+            gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file comment.md
+          else
+            echo "No comment body provided by triage result; skipping comment."
+          fi

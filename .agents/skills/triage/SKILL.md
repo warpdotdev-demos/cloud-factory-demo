@@ -1,11 +1,11 @@
 ---
 name: triage
-description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related open issues, then apply exactly one implementation-readiness label. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
+description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related open issues, then return a structured decision with exactly one implementation-readiness state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
 ---
 
 # Triage
 
-Assess the issue passed in the user's prompt and mark it with exactly one implementation-readiness state:
+Assess the issue passed in the user's prompt and decide exactly one implementation-readiness state:
 
 - `Ready to implement`
 - `Ready to spec`
@@ -13,6 +13,8 @@ Assess the issue passed in the user's prompt and mark it with exactly one implem
 - `Wait to implement`
 
 The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
+
+This is a read-only analysis: inspect the issue and codebase but do not mutate the tracker. Return the structured decision described in step 5; the caller applies the label and comment.
 
 ## Workflow
 
@@ -22,27 +24,9 @@ Extract the issue URL, key, or number from the prompt. Determine whether it belo
 
 If the prompt does not identify one issue unambiguously, ask the user for the issue rather than guessing.
 
-### 2. Post a triage-started status comment
+### 2. Fetch tracker context
 
-For GitHub Issues, post a short status comment before doing deeper work so issue subscribers know triage is in progress.
-
-Use the authenticated `gh` CLI when available. Include:
-
-- That automated Oz triage has started.
-- The implementation-readiness states being evaluated.
-- A follow-along link to the Oz run or Oz session.
-
-Use an Oz run URL or Oz session URL from the agent runtime, action output, environment, or logs. Do not use a GitHub Actions workflow URL as the follow-along link. If no Oz run or session link is available yet, say that the Oz follow-along link is not available yet rather than substituting another URL, and continue triage.
-
-Keep this comment concise. Example:
-
-> Oz triage is running now and will classify this issue as exactly one of: `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
->
-> Follow along in Oz: LINK
-
-### 3. Fetch tracker context
-
-Use the best available integration in this order:
+Read the issue using the best available integration, in this order:
 
 1. A relevant MCP server or native tracker tool
 2. The tracker's authenticated CLI, such as `gh`
@@ -59,9 +43,7 @@ Fetch:
 
 Do not classify solely from the title. Do not expose credentials or secrets while fetching tracker data.
 
-After fetching the issue description, comments, labels, and related open issues, post a brief progress comment only if this step reveals that triage may take longer than expected or needs to inspect a broader part of the codebase. Avoid noisy updates for fast, routine issues.
-
-### 4. Inspect the current codebase
+### 3. Inspect the current codebase
 
 Confirm the current checkout is the relevant repository. Search the codebase for the affected feature, behavior, terminology, and likely implementation area.
 
@@ -76,9 +58,7 @@ Assess:
 
 Prefer targeted searches and reads. This is triage, not implementation: do not edit product code.
 
-If codebase inspection uncovers a useful implementation area or an ambiguity that materially changes the triage direction, post one concise progress comment summarizing what area is being checked. Do not post internal chain-of-thought, speculative reasoning, secrets, or large command output.
-
-### 5. Choose one state
+### 4. Choose one state
 
 Use the following rubric. When evidence sits between states, choose the more cautious state.
 
@@ -126,46 +106,27 @@ Choose when:
 
 Explain what would need to change before reconsidering it. Do not use this state merely because an issue is difficult; complex but cohesive work is usually `Ready to spec`.
 
-### 6. Match and apply the tracker label
+### 5. Return the result
 
-Inspect the tracker's existing labels before changing anything.
+Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement` for `Ready to implement`). List any existing triage-state labels that should be removed.
 
-For the chosen state:
+Return a single raw JSON object as your final response — no prose and no markdown code fences:
 
-1. Prefer an existing label with the same meaning, even if capitalization or formatting differs, such as `ready-to-implement` for `Ready to implement`.
-2. Reuse the tracker's established naming convention rather than adding a duplicate.
-3. If no semantic equivalent exists and the tracker supports label creation, create the canonical label using the exact state name.
-4. Remove any existing label that semantically corresponds to one of the other three triage states.
-5. Preserve all unrelated labels.
-6. Apply exactly one triage-state label.
+```json
+{
+  "state": "Ready to implement | Ready to spec | Needs info | Wait to implement",
+  "label": "exact tracker label matching the chosen state",
+  "remove_labels": ["existing triage-state labels that should be removed"],
+  "comment": "markdown body for the issue"
+}
+```
 
-If permissions prevent creating, removing, or applying labels, do not pretend the update succeeded. Report the chosen state, the intended label change, and the permission error.
-
-### 7. Report the result
-
-Keep the final response concise and include:
-
-- Issue identifier and title
-- Chosen state and the exact label applied
-- Brief evidence-based rationale from the issue, codebase, and related open issues
-- Key implementation area or remaining questions, when relevant
-- Direct link to the issue
-
-Use this format:
-
-## Triage result
-- **Issue:** [identifier and title](URL)
-- **State:** `chosen state`
-- **Applied label:** `exact tracker label`
-- **Rationale:** 2-4 concise sentences
-- **Next step:** One concrete action
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 
-- Do not implement the issue during triage.
-- Do not close, assign, reprioritize, or otherwise mutate the issue unless the user asks.
-- Do not overwrite unrelated labels.
+- Do not mutate the tracker: no comments, labels, status, assignment, or other changes. Return the structured result instead.
+- Do not implement the issue during triage or edit product code.
 - Do not classify an issue without checking both the tracker context and the current codebase.
-- Do not post excessive status comments. Always post the triage-started comment, then post at most two additional progress comments before the final result unless the issue is blocked by permissions or missing information.
-- Do not post raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in status comments.
+- Do not put raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in the result.
 - Treat comments from maintainers and linked product/spec documents as stronger evidence than guesses from code alone.
