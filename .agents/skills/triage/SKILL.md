@@ -121,7 +121,7 @@ Return a single raw JSON object as your final response — no prose and no markd
 }
 ```
 
-Keep `comment` concise and reporter-facing: state the decision, 2-4 sentences of evidence-based rationale from the issue, codebase, and related open issues, and one concrete next step.
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 
