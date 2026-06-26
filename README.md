@@ -26,6 +26,8 @@ This repo keeps workflow templates in `templates/github/workflows/` so they can 
 
 The `.github/workflows/` directory contains the same workflows for this repo to exercise and document the templates.
 
+The triage workflow runs the agent with **read-only** GitHub permissions. The agent analyzes the issue and returns a structured JSON result; a separate deterministic job then applies the label and comment to the triggering issue only. This keeps issue-write access out of the agent's hands, so it cannot create, edit, or delete other issues.
+
 ## Installing into another repository
 
 From the root of a consuming repository, run:

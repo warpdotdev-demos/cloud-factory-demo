@@ -14,6 +14,33 @@ Assess the issue passed in the user's prompt and mark it with exactly one implem
 
 The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
 
+## Operating modes
+
+This skill runs in one of two modes. Determine which from the caller's prompt before taking any action that could change the tracker.
+
+### Read-only / structured-output mode (default for automation)
+
+Use this mode whenever the caller says you have read-only access, asks for a JSON result, or indicates that a separate step will apply the outcome. This is how the Cloud Factory `triage-issues` GitHub Actions workflow runs the skill. In this mode:
+
+- Do NOT post comments, add or remove labels, close, assign, or otherwise mutate any issue. Use the tracker (for example `gh`) only to READ.
+- Perform the full analysis (steps 1, 3, 4, and 5) and decide on exactly one state plus the matching label.
+- Emit the decision as a single raw JSON object as your FINAL response — no prose and no markdown code fences — using this schema:
+
+```json
+{
+  "state": "Ready to implement | Ready to spec | Needs info | Wait to implement",
+  "label": "exact tracker label to apply for the chosen state",
+  "remove_labels": ["existing triage-state labels that should be removed"],
+  "comment": "markdown body to post on the issue: chosen state, evidence-based rationale, and one concrete next step"
+}
+```
+
+A trusted, deterministic step owned by the caller validates this JSON and applies the label and comment to the originating issue. Skip steps 2, 6, and 7 below — they describe direct-apply mode.
+
+### Direct-apply mode (interactive)
+
+Use this mode when the caller has granted tracker write access and asks you to apply the result yourself (for example, an interactive request to triage and label an issue). In this mode, follow the full workflow below, including posting the status comment (step 2), applying the label (step 6), and reporting the result (step 7).
+
 ## Workflow
 
 ### 1. Identify the issue and tracker
@@ -23,6 +50,8 @@ Extract the issue URL, key, or number from the prompt. Determine whether it belo
 If the prompt does not identify one issue unambiguously, ask the user for the issue rather than guessing.
 
 ### 2. Post a triage-started status comment
+
+_Direct-apply mode only. Skip this step entirely in read-only / structured-output mode._
 
 For GitHub Issues, post a short status comment before doing deeper work so issue subscribers know triage is in progress.
 
@@ -128,6 +157,8 @@ Explain what would need to change before reconsidering it. Do not use this state
 
 ### 6. Match and apply the tracker label
 
+_In read-only / structured-output mode, do not modify labels. Put the chosen label in the JSON `label` field and any superseded triage-state labels in `remove_labels`, then stop. The steps below apply to direct-apply mode._
+
 Inspect the tracker's existing labels before changing anything.
 
 For the chosen state:
@@ -142,6 +173,8 @@ For the chosen state:
 If permissions prevent creating, removing, or applying labels, do not pretend the update succeeded. Report the chosen state, the intended label change, and the permission error.
 
 ### 7. Report the result
+
+_In read-only / structured-output mode, your final response is the JSON object described in Operating modes — do not emit the human-readable report below. The format below applies to direct-apply mode._
 
 Keep the final response concise and include:
 
@@ -166,6 +199,6 @@ Use this format:
 - Do not close, assign, reprioritize, or otherwise mutate the issue unless the user asks.
 - Do not overwrite unrelated labels.
 - Do not classify an issue without checking both the tracker context and the current codebase.
-- Do not post excessive status comments. Always post the triage-started comment, then post at most two additional progress comments before the final result unless the issue is blocked by permissions or missing information.
+- In read-only / structured-output mode, do not post any comments or mutate the tracker; return the structured JSON result instead. In direct-apply mode, do not post excessive status comments: post the triage-started comment, then at most two additional progress comments before the final result unless the issue is blocked by permissions or missing information.
 - Do not post raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in status comments.
 - Treat comments from maintainers and linked product/spec documents as stronger evidence than guesses from code alone.

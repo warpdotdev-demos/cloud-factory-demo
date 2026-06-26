@@ -31,6 +31,7 @@ The setup is complete when:
 - **Skills** are reusable agent instructions checked into `.agents/skills/`.
 - **GitHub Actions** provides the event triggers and repository checkout for this demo.
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
+- The triage workflow runs the agent **read-only**: a first job grants the agent only `contents: read` and `issues: read` and has it emit a structured JSON result, and a second deterministic `apply` job (`issues: write`) applies the label and comment to the triggering issue only. The agent never holds issue-write access, so it cannot modify other issues.
 - **Implementation** runs only when the issue receives a ready-to-implement label.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
@@ -220,10 +221,10 @@ Ask permission before creating a test issue because opening it triggers a billab
 
 Create one small, clear, safe issue that is relevant to the target repository. Avoid an issue likely to cause destructive, security-sensitive, or broad changes. Capture its URL.
 
-Watch the `Triage New Issues` workflow and inspect its result with `gh run list` and `gh run view`. Confirm:
+Watch the `Triage New Issues` workflow and inspect its result with `gh run list` and `gh run view`. The workflow runs two jobs: a read-only `triage` job (the agent analyzes the issue and emits a JSON result) and a deterministic `apply` job that posts the result comment and applies the label. Confirm:
 
-- The workflow ran successfully.
-- Oz posted a triage-started comment and final result.
+- Both jobs ran successfully.
+- The `apply` job posted the triage result as a comment on the issue.
 - Exactly one triage-state label was applied.
 - The Oz run is visible in the Oz Runs page.
 
