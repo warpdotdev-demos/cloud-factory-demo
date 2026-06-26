@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   triage:
-    name: Analyze issue (read-only)
+    name: Triage issue
     runs-on: ubuntu-latest
     permissions:
       contents: read # let the agent inspect the checked-out codebase
@@ -30,7 +30,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Triage with Oz agent (read-only)
+      - name: Triage with Oz agent
         uses: warpdotdev/oz-agent-action@v1
         id: triage
         env:
@@ -40,8 +40,7 @@ jobs:
           name: "Triage issue #${{ github.event.issue.number }}"
           prompt: |
             Triage GitHub issue #${{ github.event.issue.number }} in this
-            repository, following the triage skill in read-only /
-            structured-output mode.
+            repository using the triage skill.
 
             - Repository: ${{ github.repository }}
             - Issue URL: ${{ github.event.issue.html_url }}

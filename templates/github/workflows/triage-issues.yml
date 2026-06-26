@@ -19,32 +19,28 @@ concurrency:
 
 jobs:
   triage:
-    name: Analyze issue (read-only)
+    name: Triage issue
     runs-on: ubuntu-latest
     permissions:
-      contents: read   # let the agent inspect the checked-out codebase
-      issues: read      # let the agent READ the issue/comments/labels — never write
-    # Expose the agent's structured JSON result to the privileged apply job.
+      contents: read # let the agent inspect the checked-out codebase
+      issues: read # let the agent read the issue/comments/labels — never write
     outputs:
       triage_result: ${{ steps.triage.outputs.agent_output }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Triage with Oz agent (read-only)
+      - name: Triage with Oz agent
         uses: warpdotdev/oz-agent-action@v1
         id: triage
         env:
           GH_TOKEN: ${{ github.token }}
         with:
-          # Uses .agents/skills/triage/SKILL.md as the base prompt; its
-          # read-only / structured-output mode defines the JSON result schema.
           skill: triage
           name: "Triage issue #${{ github.event.issue.number }}"
           prompt: |
             Triage GitHub issue #${{ github.event.issue.number }} in this
-            repository, following the triage skill in read-only /
-            structured-output mode.
+            repository using the triage skill.
 
             - Repository: ${{ github.repository }}
             - Issue URL: ${{ github.event.issue.html_url }}
@@ -59,7 +55,7 @@ jobs:
     needs: triage
     runs-on: ubuntu-latest
     permissions:
-      issues: write   # deterministic writes, scoped to the triggering issue only
+      issues: write
     steps:
       - name: Apply label and comment
         env:
