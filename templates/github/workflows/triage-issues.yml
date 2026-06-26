@@ -1,23 +1,12 @@
 name: Triage New Issues
 
-# Triages a newly opened issue with an Oz cloud agent, then applies the result.
+# Triages a newly opened issue with an Oz cloud agent.
 #
-# Security model:
-#   - The agent runs READ-ONLY. Its job is granted only `contents: read` and
-#     `issues: read`, so even a prompt-injected agent cannot create, edit, or
-#     delete any issue. The agent only analyzes the issue and emits a structured
-#     JSON result as its final response (surfaced via the action's
-#     `agent_output`).
-#   - A separate, deterministic `apply` job holds `issues: write` and applies the
-#     label and comment using plain `gh` calls scoped exclusively to the issue
-#     that triggered the run (`github.event.issue.number`). It runs no
-#     agent-generated commands, so the write surface stays confined to one issue.
+# The agent runs read-only (issues: read) and emits a structured JSON result;
+# the separate `apply` job (issues: write) applies the label and comment to the
+# triggering issue only.
 #
-# Setup:
-#   - The WARP_API_KEY repository secret must be set (the Oz API key).
-#     It is sourced locally from the gitignored .oz-api-key file.
-#   - The triage skill lives at .agents/skills/triage/ and is resolved by the
-#     action's `skill` input below.
+# Setup: the WARP_API_KEY repository secret must be set (the Oz API key).
 
 on:
   issues:
@@ -46,43 +35,22 @@ jobs:
         uses: warpdotdev/oz-agent-action@v1
         id: triage
         env:
-          # Read-only token: the job permissions above mean this token cannot
-          # mutate issues, so the agent can fetch context but cannot write.
           GH_TOKEN: ${{ github.token }}
         with:
-          # Uses .agents/skills/triage/SKILL.md as the base prompt.
+          # Uses .agents/skills/triage/SKILL.md as the base prompt; its
+          # read-only / structured-output mode defines the JSON result schema.
           skill: triage
           name: "Triage issue #${{ github.event.issue.number }}"
-          # Only inject GitHub-generated, non-freeform values to avoid prompt
-          # injection; the agent fetches title/body/comments itself via `gh`.
           prompt: |
-            Analyze (do NOT modify) the GitHub issue that was just opened in this repository.
+            Triage GitHub issue #${{ github.event.issue.number }} in this
+            repository, following the triage skill in read-only /
+            structured-output mode.
 
             - Repository: ${{ github.repository }}
-            - Issue number: #${{ github.event.issue.number }}
             - Issue URL: ${{ github.event.issue.html_url }}
 
-            You have READ-ONLY GitHub access. Do NOT post comments, add or remove
-            labels, close, assign, or otherwise mutate any issue. Use the `gh`
-            CLI only to READ the issue (title, body, comments, existing labels),
-            the repository's available labels, and related open issues.
-
-            Follow the triage skill in read-only / structured-output mode: use
-            the `gh` CLI and this checked-out codebase to choose exactly one
-            implementation-readiness state, then output ONLY a single raw JSON
-            object as your FINAL response — no prose, no explanation, and no
-            markdown code fences. The object must match this schema exactly:
-
-            {
-              "state": "Ready to implement | Ready to spec | Needs info | Wait to implement",
-              "label": "exact tracker label to apply for the chosen state",
-              "remove_labels": ["existing triage-state labels that should be removed"],
-              "comment": "markdown body to post on the issue: chosen state, evidence-based rationale, and one concrete next step"
-            }
-
-            The workflow's deterministic apply job will validate this JSON and
-            apply the label and comment to issue #${{ github.event.issue.number }}
-            on your behalf. Do not attempt those mutations yourself.
+            Return the JSON result the skill specifies as your final response;
+            the apply job applies the label and comment from it.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
 
@@ -95,9 +63,6 @@ jobs:
     steps:
       - name: Apply label and comment
         env:
-          # This token may write issues, but it is only used by the trusted
-          # shell logic below — never by the agent — and only against the issue
-          # that triggered this run.
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
@@ -125,15 +90,13 @@ jobs:
           STATE="$(jq -r '.state // ""' triage_result.json)"
           LABEL="$(jq -r '.label // ""' triage_result.json)"
 
-          # Enforce a strict allowlist of triage states so the agent cannot
-          # request arbitrary lifecycle changes.
-          case "$STATE" in
-            "Ready to implement"|"Ready to spec"|"Needs info"|"Wait to implement") ;;
-            *)
-              echo "::error::Unexpected triage state: '$STATE'. Expected one of the four readiness states." >&2
-              exit 1
-              ;;
-          esac
+          # Require the structured fields the apply step needs. The set of valid
+          # states/labels is owned by the triage skill, so it is intentionally
+          # not duplicated here.
+          if [ -z "$STATE" ]; then
+            echo "::error::Triage result is missing a 'state'." >&2
+            exit 1
+          fi
 
           if [ -z "$LABEL" ]; then
             echo "::error::Triage result is missing a 'label' to apply." >&2

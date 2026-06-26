@@ -20,11 +20,11 @@ This skill runs in one of two modes. Determine which from the caller's prompt be
 
 ### Read-only / structured-output mode (default for automation)
 
-Use this mode whenever the caller says you have read-only access, asks for a JSON result, or indicates that a separate step will apply the outcome. This is how the Cloud Factory `triage-issues` GitHub Actions workflow runs the skill. In this mode:
+Use this mode whenever the caller says you have read-only access, asks for a JSON result, or indicates that a separate step will apply the outcome.
 
 - Do NOT post comments, add or remove labels, close, assign, or otherwise mutate any issue. Use the tracker (for example `gh`) only to READ.
 - Perform the full analysis (steps 1, 3, 4, and 5) and decide on exactly one state plus the matching label.
-- Emit the decision as a single raw JSON object as your FINAL response — no prose and no markdown code fences — using this schema:
+Emit the decision as a single raw JSON object as your FINAL response — no prose and no markdown code fences — using this schema:
 
 ```json
 {
