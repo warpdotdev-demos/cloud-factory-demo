@@ -133,9 +133,9 @@ jobs:
           # Apply the chosen triage-state label to the triggering issue only.
           gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --add-label "$LABEL"
 
-          # Post the triage comment to the triggering issue only.
           jq -r '.comment // ""' triage_result.json > comment.md
           if [ -s comment.md ]; then
+            printf '\n\n---\n_Powered by [Oz](https://warp.dev/oz)_\n' >> comment.md
             gh issue comment "$ISSUE_NUMBER" --repo "$REPO" --body-file comment.md
           else
             echo "No comment body provided by triage result; skipping comment."
