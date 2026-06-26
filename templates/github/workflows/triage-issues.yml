@@ -71,14 +71,34 @@ jobs:
             exit 1
           fi
 
-          # Capture the raw agent output, then strip any surrounding markdown
-          # code fences (```json ... ```) the agent may have added despite the
-          # instructions, leaving only the JSON object.
+          # The action returns the agent's full final response, which may
+          # include prose around the JSON. Extract the last triage-result
+          # object (the one carrying "state"/"label") into triage_result.json.
           printf '%s' "$TRIAGE_RESULT" > raw_output.txt
-          sed -e 's/^[[:space:]]*```[a-zA-Z]*[[:space:]]*$//' -e 's/^[[:space:]]*```[[:space:]]*$//' raw_output.txt > triage_result.json
+          if ! python3 - raw_output.txt > triage_result.json <<'PY'
+          import json, sys
 
-          if ! jq -e . triage_result.json >/dev/null 2>&1; then
-            echo "::error::Agent output was not valid JSON. Raw output:" >&2
+          text = open(sys.argv[1], encoding="utf-8").read()
+          decoder = json.JSONDecoder()
+          last_obj = last_triage = None
+          for i, ch in enumerate(text):
+              if ch != "{":
+                  continue
+              try:
+                  obj, _ = decoder.raw_decode(text[i:])
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(obj, dict):
+                  last_obj = obj
+                  if "state" in obj and "label" in obj:
+                      last_triage = obj
+          result = last_triage if last_triage is not None else last_obj
+          if result is None:
+              sys.exit(1)
+          json.dump(result, sys.stdout)
+          PY
+          then
+            echo "::error::Could not find a JSON object in the agent output. Raw output:" >&2
             cat raw_output.txt >&2
             exit 1
           fi
