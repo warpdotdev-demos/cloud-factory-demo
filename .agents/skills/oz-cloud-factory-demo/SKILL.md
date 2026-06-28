@@ -1,6 +1,6 @@
 ---
 name: oz-cloud-factory-demo
-description: Sets up a beginner-friendly Oz cloud software factory that automatically triages new GitHub issues and implements issues labeled ready-to-implement. Use when a user wants to install, configure, test, or understand the Cloud Factory demo in a repository of their choice.
+description: Sets up a beginner-friendly Oz cloud software factory that automatically triages new GitHub issues, specs issues labeled ready-to-spec, and implements issues labeled ready-to-implement. Use when a user wants to install, configure, test, or understand the Cloud Factory demo in a repository of their choice.
 ---
 
 # Oz Cloud Factory Demo
@@ -8,7 +8,7 @@ description: Sets up a beginner-friendly Oz cloud software factory that automati
 Guide a user who is new to Oz through setting up this flow in a GitHub repository:
 
 ```text
-new issue -> Oz triage -> Ready to implement label -> Oz implementation -> pull request
+new issue -> Oz triage -> Ready to spec label -> Oz spec -> Ready to implement label -> Oz implementation -> pull request
 ```
 
 Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-demo`. Explain each action before taking it, keep secrets out of output and files, and stop at explicit activation checkpoints.
@@ -17,12 +17,13 @@ Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-d
 
 The setup is complete when:
 
-- The target repository contains the `triage` and `implementation` skills.
-- The target repository contains the two Cloud Factory GitHub workflows.
+- The target repository contains the `triage`, `spec`, and `implementation` skills.
+- The target repository contains the three Cloud Factory GitHub workflows.
 - The repository has a team-scoped Oz API key stored as the `WARP_API_KEY` Actions secret.
 - The Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests.
 - The setup is committed and pushed to the repository's default branch.
 - A newly opened test issue triggers triage and receives exactly one triage-state label.
+- Applying `Ready to spec` triggers spec work and, for a suitable issue, posts a product and technical spec.
 - Applying `Ready to implement` triggers implementation and, for a suitable issue, produces a pull request.
 
 ## Important concepts to explain
@@ -32,6 +33,7 @@ The setup is complete when:
 - **GitHub Actions** provides the event triggers and repository checkout for this demo.
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
 - The triage workflow runs the agent **read-only**: a first job grants the agent only `contents: read` and `issues: read` and has it emit a structured JSON result, and a second deterministic `apply` job (`issues: write`) applies the label and comment to the triggering issue only. The agent never holds issue-write access, so it cannot modify other issues.
+- **Spec** runs when the issue receives a ready-to-spec label and writes a product and technical spec before routing the issue onward.
 - **Implementation** runs only when the issue receives a ready-to-implement label.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
@@ -57,8 +59,8 @@ If no local checkout exists, ask where the user wants it cloned, then clone it w
 
 If the user is testing installation from a clean state, verify both the local checkout and the remote default branch are clean:
 
-- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
-- Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues` or `Implement Ready Issues` workflows.
+- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
+- Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues`, `Spec Ready Issues`, or `Implement Ready Issues` workflows.
 - Check `gh secret list --repo "$TARGET_REPO"` for an existing `WARP_API_KEY` secret.
 - If any are present, explain that the repository is not a clean activation target. Ask whether to continue against the existing setup or create a fresh test repository.
 
@@ -155,13 +157,16 @@ rm "$tmp_installer"
 The installer must add:
 
 - `.agents/skills/triage/SKILL.md`
+- `.agents/skills/spec/SKILL.md`
 - `.agents/skills/implementation/SKILL.md`
 - `.github/workflows/triage-issues.yml`
+- `.github/workflows/spec-ready-issues.yml`
 - `.github/workflows/implement-ready-issues.yml`
 
 Review the resulting diff. Explain:
 
 - `triage-issues.yml` triggers when an issue is opened.
+- `spec-ready-issues.yml` triggers when an issue receives a ready-to-spec label.
 - `implement-ready-issues.yml` triggers when an issue receives a ready-to-implement label.
 - The workflows use `warpdotdev/oz-agent-action@v1`.
 - GitHub's token supplies repository permissions; `WARP_API_KEY` authenticates Oz.
@@ -205,11 +210,12 @@ Before activation, review:
 - GitHub Actions workflow permissions, especially whether Actions can create and approve pull requests
 - The four triage labels and routing behavior
 - Expected credit consumption
+- The fact that spec agents can post specs and change readiness labels
 - The fact that implementation agents can push branches and open PRs
 
 Do not commit or push without explicit user approval. The workflows only activate after they are present on the default branch. If the user prefers review first, create a setup branch and pull request, then explain that automation begins after merge.
 
-After activation, confirm both workflows appear with:
+After activation, confirm all three workflows appear with:
 
 ```sh
 gh workflow list --repo "$TARGET_REPO"
@@ -228,11 +234,26 @@ Watch the `Triage New Issues` workflow and inspect its result with `gh run list`
 - Exactly one triage-state label was applied.
 - The Oz run is visible in the Oz Runs page.
 
-If triage does not choose `Ready to implement`, do not override the label merely to force implementation. Explain the result and either improve the test issue with the user or create a separate clearly implementable test issue with permission.
+If triage does not choose `Ready to implement` or `Ready to spec`, do not override the label merely to force a downstream run. Explain the result and either improve the test issue with the user or create a separate suitable test issue with permission.
+
+If triage applies `Ready to spec` but no spec workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. GitHub does not trigger most new workflow runs from events created by `GITHUB_TOKEN`, so a label applied by the triage workflow may not fire the separate `issues.labeled` spec workflow. For a smoke test, explain this limitation and ask before manually removing and re-adding the label as a human user. For a durable setup, recommend changing the workflow design to use a PAT or GitHub App token for label writes, dispatch the spec workflow explicitly, or combine orchestration so spec work is not dependent on a suppressed follow-up event.
 
 If triage applies `Ready to implement` but no implementation workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. GitHub does not trigger most new workflow runs from events created by `GITHUB_TOKEN`, so a label applied by the triage workflow may not fire the separate `issues.labeled` implementation workflow. For a smoke test, explain this limitation and ask before manually removing and re-adding the label as a human user. For a durable setup, recommend changing the workflow design to use a PAT or GitHub App token for label writes, dispatch the implementation workflow explicitly, or combine orchestration so implementation is not dependent on a suppressed follow-up event.
 
-### 7. Test implementation
+### 7. Test spec work
+
+Before allowing a `Ready to spec` label to trigger spec work, remind the user that this starts another billable run that may post comments and change labels.
+
+Watch the `Spec Ready Issues` workflow. Confirm:
+
+- The spec run starts.
+- The agent posts progress to the issue.
+- The agent posts a product and technical spec.
+- The agent applies `Ready to implement` if the spec has no material open questions, or `Needs info` if human input is still required.
+
+If spec applies `Ready to implement` but no implementation workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. Account for GitHub's `GITHUB_TOKEN` event suppression in the same way as the triage-to-spec handoff.
+
+### 8. Test implementation
 
 Before allowing a `Ready to implement` label to trigger implementation, remind the user that this starts another billable run that may push a branch and open a PR.
 
@@ -247,13 +268,14 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 
 ## Troubleshooting
 
-- **Workflow is missing:** Confirm both workflow files are committed to the default branch and Actions is enabled.
+- **Workflow is missing:** Confirm all three workflow files are committed to the default branch and Actions is enabled.
 - **`WARP_API_KEY` error:** Confirm the repository secret exists and the key is valid. Never expose its value.
 - **Team key cannot write to GitHub:** Confirm team GitHub authorization is configured for the target repository.
 - **`insufficient_credits`:** Direct a team admin to purchase Add-on Credits in Oz or Warp billing settings, then retry.
 - **Permission failure:** Compare the workflow's `permissions` block with the attempted action and check repository or organization Actions policy.
 - **PR creation blocked:** Enable repository or organization Actions settings that allow GitHub Actions to create and approve pull requests, or configure a PAT/GitHub App token with pull request write permission.
 - **Skill not found:** Confirm the exact installed paths and that the triage workflow references `triage`.
+- **Spec does not trigger:** Confirm the issue received `Ready to spec`, `ready-to-spec`, or `ready to spec`. If triage added the label from `github-actions`, account for GitHub's `GITHUB_TOKEN` event suppression.
 - **Implementation does not trigger:** Confirm the issue received `Ready to implement`, `ready-to-implement`, or `ready to implement`. If triage added the label from `github-actions`, account for GitHub's `GITHUB_TOKEN` event suppression.
 - **Agent cannot build the project:** Improve the repository's setup instructions or implementation skill, or update the GitHub Actions runner setup so the required toolchain is available.
 
@@ -261,7 +283,7 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 
 - Never reveal, print, or commit API keys or other secrets.
 - Never create or substitute personal Oz API keys, secrets, or Agent Profiles for this setup.
-- Never activate workflows, open a test issue, trigger implementation, or push to the default branch without explaining the consequence and receiving explicit approval.
+- Never activate workflows, open a test issue, trigger spec work, trigger implementation, or push to the default branch without explaining the consequence and receiving explicit approval.
 - Never weaken repository protections or broaden workflow permissions just to make the demo pass.
 - Never force ambiguous or risky issues into `Ready to implement`.
 - Never merge an implementation PR automatically.

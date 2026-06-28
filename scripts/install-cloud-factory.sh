@@ -19,10 +19,11 @@ fi
 
 # Keep npx from consuming the rest of this script when users install with
 # `curl ... | bash`.
-npx skills add "${REPO}" --skill triage --skill implementation --agent warp --yes < /dev/null
+npx skills add "${REPO}" --skill triage --skill spec --skill implementation --agent warp --yes < /dev/null
 
 mkdir -p .github/workflows
 curl -fsSL "${RAW_BASE}/templates/github/workflows/triage-issues.yml" -o .github/workflows/triage-issues.yml
+curl -fsSL "${RAW_BASE}/templates/github/workflows/spec-ready-issues.yml" -o .github/workflows/spec-ready-issues.yml
 curl -fsSL "${RAW_BASE}/templates/github/workflows/implement-ready-issues.yml" -o .github/workflows/implement-ready-issues.yml
 
 printf 'Installed Cloud Factory skills and GitHub Actions workflow templates from %s@%s.\n' "${REPO}" "${REF}"

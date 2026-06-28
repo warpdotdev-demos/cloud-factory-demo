@@ -47,6 +47,8 @@ Do not classify solely from the title. Do not expose credentials or secrets whil
 
 Confirm the current checkout is the relevant repository. Search the codebase for the affected feature, behavior, terminology, and likely implementation area.
 
+If `roadmap.md` or `vision.md` exist at the repository root, read them first. Use them to determine whether the issue aligns with the stated product direction before choosing a state.
+
 Assess:
 
 - Whether the described behavior exists today
@@ -54,6 +56,7 @@ Assess:
 - Whether the issue has a bounded implementation path
 - Dependencies, migrations, platform differences, and testing requirements
 - Existing abstractions that make the change cohesive or indicate it does not fit
+- Whether the issue aligns with the roadmap and vision (if those documents exist)
 - Whether related open issues or active work change the recommendation
 
 Prefer targeted searches and reads. This is triage, not implementation: do not edit product code.
@@ -76,14 +79,17 @@ Small bugs with clear reproduction steps and straightforward improvements usuall
 
 #### Ready to spec
 
-Choose when:
+Choose when ALL of the following are true:
 
 - The product goal is clear and appears worthwhile
-- The work fits the product
-- Material product or technical decisions remain
-- Multiple valid designs, broad surface-area changes, migrations, or non-trivial dependencies make one-shot implementation risky
+- The work aligns with the product's roadmap and vision
+- The issue has either ambiguity or significant complexity:
+  - **Ambiguity**: Multiple valid product or technical implementations exist with significant differences; a human should weigh in on which direction to pursue
+  - **Complexity**: The implementation is likely more than a few hundred lines of code, spans multiple systems, requires migrations, or carries non-trivial risk
 
 The issue should be clear enough to begin product or technical specification work without first asking the reporter basic questions.
+
+If the repository contains `roadmap.md` or `vision.md`, read them before applying this state. Only apply `ready-to-spec` when the issue fits the stated product direction. If the issue is interesting but does not align with the roadmap or vision, prefer `wait-to-implement` instead.
 
 #### Needs info
 

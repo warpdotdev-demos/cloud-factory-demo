@@ -45,8 +45,15 @@ jobs:
             - Repository: ${{ github.repository }}
             - Issue URL: ${{ github.event.issue.html_url }}
 
+            Follow the triage skill: use the `gh` CLI to fetch the full issue
+            (title, body, comments, existing labels) and related open issues,
+            read `roadmap.md` and `vision.md` if present, inspect this
+            checked-out codebase, then choose exactly one
+            implementation-readiness state.
+
             Return the JSON result the skill specifies as your final response;
-            the apply job applies the label and comment from it.
+            the apply job applies the label and comment from it. Do not comment
+            on, label, or otherwise mutate the issue directly from this job.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
 

@@ -1,0 +1,60 @@
+name: Spec Ready Issues
+
+# Runs an Oz cloud agent when an issue receives a ready-to-spec label.
+# The agent follows .agents/skills/spec/SKILL.md to write a product and
+# technical spec, post it back to the issue, and update readiness labels.
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: spec-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  spec:
+    name: Spec issue
+    runs-on: ubuntu-latest
+    if: >-
+      github.event.label.name == 'Ready to spec' ||
+      github.event.label.name == 'ready-to-spec' ||
+      github.event.label.name == 'ready to spec'
+    permissions:
+      contents: read   # let the agent inspect the checked-out codebase
+      issues: write    # let the agent post the spec and update labels
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Spec issue with Oz agent
+        uses: warpdotdev/oz-agent-action@v1
+        id: spec
+        env:
+          # Authenticates the `gh` CLI the agent uses for issues and labels.
+          GH_TOKEN: ${{ github.token }}
+        with:
+          skill: spec
+          name: "Spec issue #${{ github.event.issue.number }}"
+          prompt: |
+            Write a product and technical spec for the GitHub issue that was just labeled ready to spec.
+
+            - Repository: ${{ github.repository }}
+            - Issue number: #${{ github.event.issue.number }}
+            - Issue URL: ${{ github.event.issue.html_url }}
+            - Applied label: ${{ github.event.label.name }}
+
+            Follow the spec skill: fetch the full issue and comments with the
+            authenticated `gh` CLI, read `roadmap.md` and `vision.md` if present,
+            inspect this checked-out codebase, write an implementation-ready
+            product and technical spec, and post it as a comment on the original
+            issue. Post status comments as directed by the skill, using only an
+            Oz run or Oz session URL as the follow-along link. Do not use the
+            GitHub Actions workflow URL as the follow-along link.
+
+            If the completed spec has no material open questions, apply a
+            ready-to-implement label and remove ready-to-spec labels while
+            preserving unrelated labels. If material questions remain, apply or
+            keep a needs-info label instead. Do not implement the issue.
+          warp_api_key: ${{ secrets.WARP_API_KEY }}
+          profile: ${{ vars.WARP_AGENT_PROFILE || '' }}

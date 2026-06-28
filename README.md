@@ -14,6 +14,7 @@ The factory is organized around six stages:
 ## Included skills
 
 - `.agents/skills/triage/SKILL.md` — triages issue-tracker issues and applies exactly one implementation-readiness label.
+- `.agents/skills/spec/SKILL.md` — writes a product and technical spec for issues labeled ready-to-spec, then routes them toward implementation or more information.
 - `.agents/skills/implementation/SKILL.md` — implements a ready issue, validates the change, opens a PR, and reports progress back to the original issue.
 - `.agents/skills/oz-cloud-factory-demo/SKILL.md` — walks a user who is new to Oz through installing, configuring, activating, and testing the triage-to-implementation factory in a repository of their choice.
 
@@ -22,6 +23,7 @@ The factory is organized around six stages:
 This repo keeps workflow templates in `templates/github/workflows/` so they can be copied into consuming repositories:
 
 - `templates/github/workflows/triage-issues.yml` — runs Oz triage when a new GitHub issue is opened.
+- `templates/github/workflows/spec-ready-issues.yml` — runs Oz spec work when an issue receives a `Ready to spec` label.
 - `templates/github/workflows/implement-ready-issues.yml` — runs Oz implementation when an issue receives a `Ready to implement` label.
 
 The `.github/workflows/` directory contains the same workflows for this repo to exercise and document the templates.
@@ -39,7 +41,7 @@ rm "$tmp_installer"
 
 The installer:
 
-1. Installs the `triage` and `implementation` skills from this canonical repo with `npx skills add`.
+1. Installs the `triage`, `spec`, and `implementation` skills from this canonical repo with `npx skills add`.
 2. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
 
 The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
@@ -47,7 +49,7 @@ The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
 If you only want to install the skills without copying workflows, run:
 
 ```bash
-npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill implementation --agent warp --yes
+npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill spec --skill implementation --agent warp --yes
 ```
 
 To install the guided setup skill, run:
