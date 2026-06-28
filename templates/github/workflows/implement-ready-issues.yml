@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Install spec validation skill
+        run: npx skills add warpdotdev/common-skills --skill validate-changes-match-specs --agent warp --yes
 
       - name: Implement issue with Oz agent
         uses: warpdotdev/oz-agent-action@v1
@@ -48,9 +50,12 @@ jobs:
 
             Fetch the full issue and comments with the authenticated `gh` CLI,
             find and read any linked or checked-in `PRODUCT.md` and `TECH.md`
-            specs, inspect this checked-out codebase, implement the smallest
-            cohesive fix or feature, validate it, create a branch, push it, and
-            open a GitHub pull request. Post implementation progress comments
+            specs before inspecting implementation areas, inspect this checked-out
+            codebase, implement the smallest cohesive fix or feature, validate it,
+            and if specs exist, read and follow
+            `.agents/skills/validate-changes-match-specs/SKILL.md` to confirm the
+            implementation matches those specs. Then create a branch, push it,
+            and open a GitHub pull request. Post implementation progress comments
             to the original issue as directed by the skill, using only an Oz run
             or Oz session URL as the follow-along link. Do not use the GitHub
             Actions workflow URL as the follow-along link. Do not post a final

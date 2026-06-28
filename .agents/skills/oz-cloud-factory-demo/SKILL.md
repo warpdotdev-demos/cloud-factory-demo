@@ -17,7 +17,7 @@ Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-d
 
 The setup is complete when:
 
-- The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, and `implementation` skills.
+- The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, `validate-changes-match-specs`, and `implementation` skills.
 - The target repository contains the three Cloud Factory GitHub workflows.
 - The repository has a team-scoped Oz API key stored as the `WARP_API_KEY` Actions secret.
 - The Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests.
@@ -34,7 +34,7 @@ The setup is complete when:
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
 - The triage workflow runs the agent **read-only**: a first job grants the agent only `contents: read` and `issues: read` and has it emit a structured JSON result, and a second deterministic `apply` job (`issues: write`) applies the label and comment to the triggering issue only. The agent never holds issue-write access, so it cannot modify other issues.
 - **Spec** runs when the issue receives a ready-to-spec label, delegates spec content to the common `write-product-spec` and `write-tech-spec` skills, and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
-- **Implementation** runs only when the issue receives a ready-to-implement label.
+- **Implementation** runs only when the issue receives a ready-to-implement label. If `PRODUCT.md` and `TECH.md` specs exist, it reads them first and uses `validate-changes-match-specs` to check the completed diff against the specs before opening a PR.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
 ## Workflow
@@ -59,7 +59,7 @@ If no local checkout exists, ask where the user wants it cloned, then clone it w
 
 If the user is testing installation from a clean state, verify both the local checkout and the remote default branch are clean:
 
-- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/write-product-spec`, `.agents/skills/write-tech-spec`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
+- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/write-product-spec`, `.agents/skills/write-tech-spec`, `.agents/skills/validate-changes-match-specs`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
 - Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues`, `Spec Ready Issues`, or `Implement Ready Issues` workflows.
 - Check `gh secret list --repo "$TARGET_REPO"` for an existing `WARP_API_KEY` secret.
 - If any are present, explain that the repository is not a clean activation target. Ask whether to continue against the existing setup or create a fresh test repository.
@@ -160,6 +160,7 @@ The installer must add:
 - `.agents/skills/spec/SKILL.md`
 - `.agents/skills/write-product-spec/SKILL.md`
 - `.agents/skills/write-tech-spec/SKILL.md`
+- `.agents/skills/validate-changes-match-specs/SKILL.md`
 - `.agents/skills/implementation/SKILL.md`
 - `.github/workflows/triage-issues.yml`
 - `.github/workflows/spec-ready-issues.yml`
@@ -169,7 +170,7 @@ Review the resulting diff. Explain:
 
 - `triage-issues.yml` triggers when an issue is opened.
 - `spec-ready-issues.yml` triggers when an issue receives a ready-to-spec label and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
-- `implement-ready-issues.yml` triggers when an issue receives a ready-to-implement label.
+- `implement-ready-issues.yml` triggers when an issue receives a ready-to-implement label and validates the completed implementation against `PRODUCT.md` and `TECH.md` when specs exist.
 - The workflows use `warpdotdev/oz-agent-action@v1`.
 - GitHub's token supplies repository permissions; `WARP_API_KEY` authenticates Oz.
 

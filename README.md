@@ -34,7 +34,8 @@ flowchart LR
   Review --> ImplementLabel
   ImplementLabel --> ImplementWorkflow["GitHub Actions:<br/>implement-ready-issues.yml"]
   ImplementWorkflow --> ImplementSkill["Oz implementation agent<br/>.agents/skills/implementation"]
-  ImplementSkill --> ImplementationPR["Implementation pull request"]
+  ImplementSkill --> ValidateSkill["Validates against specs<br/>validate-changes-match-specs"]
+  ValidateSkill --> ImplementationPR["Implementation pull request"]
   ImplementationPR --> HumanReview["Human review and merge"]
 ```
 
@@ -46,6 +47,7 @@ The diagram shows the implemented portion of the factory today: triage, spec gen
 - `.agents/skills/spec/SKILL.md` — coordinates spec work for issues labeled ready-to-spec by delegating to the common `write-product-spec` and `write-tech-spec` skills, then opening a specs PR containing `PRODUCT.md` and `TECH.md`.
 - `.agents/skills/write-product-spec/SKILL.md` — installed from `warpdotdev/common-skills`; writes the product spec artifact.
 - `.agents/skills/write-tech-spec/SKILL.md` — installed from `warpdotdev/common-skills`; writes the technical spec artifact after `PRODUCT.md`.
+- `.agents/skills/validate-changes-match-specs/SKILL.md` — installed from `warpdotdev/common-skills`; checks implementation diffs against `PRODUCT.md` and `TECH.md` when specs exist.
 - `.agents/skills/implementation/SKILL.md` — implements a ready issue, validates the change, opens a PR, and reports progress back to the original issue.
 - `.agents/skills/oz-cloud-factory-demo/SKILL.md` — walks a user who is new to Oz through installing, configuring, activating, and testing the triage-to-implementation factory in a repository of their choice.
 
@@ -73,7 +75,7 @@ rm "$tmp_installer"
 The installer:
 
 1. Installs the `triage`, `spec`, and `implementation` skills from this canonical repo with `npx skills add`.
-2. Installs `write-product-spec` and `write-tech-spec` from `warpdotdev/common-skills`.
+2. Installs `write-product-spec`, `write-tech-spec`, and `validate-changes-match-specs` from `warpdotdev/common-skills`.
 3. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
 
 The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
@@ -82,7 +84,7 @@ If you only want to install the skills without copying workflows, run:
 
 ```bash
 npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill spec --skill implementation --agent warp --yes
-npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --agent warp --yes
+npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --skill validate-changes-match-specs --agent warp --yes
 ```
 
 To install the guided setup skill, run:
