@@ -11,6 +11,35 @@ The factory is organized around six stages:
 - **Verification** — confirm the merged or proposed change satisfies the original request and passes the required checks.
 - **Monitoring** — watch outcomes after changes land, surface regressions, and feed new findings back into triage.
 
+## Implemented flow
+
+```mermaid
+flowchart LR
+  Issue["New GitHub issue"] --> TriageWorkflow["GitHub Actions:<br/>triage-issues.yml"]
+  TriageWorkflow --> TriageSkill["Oz triage agent<br/>.agents/skills/triage"]
+  TriageSkill --> Decision{"Readiness state"}
+  Decision -->|Ready to implement| ImplementLabel["Apply Ready to implement"]
+  Decision -->|Ready to spec| SpecLabel["Apply Ready to spec"]
+  Decision -->|Needs info| NeedsInfo["Apply Needs info<br/>and ask for details"]
+  Decision -->|Wait to implement| Wait["Apply Wait to implement<br/>and explain why"]
+  SpecLabel --> SpecWorkflow["GitHub Actions:<br/>spec-ready-issues.yml"]
+  SpecWorkflow --> SpecSkill["Oz spec agent<br/>.agents/skills/spec"]
+  SpecSkill --> ProductSkill["Delegates to<br/>write-product-spec"]
+  ProductSkill --> ProductMd["specs/&lt;issue-slug&gt;/PRODUCT.md"]
+  SpecSkill --> TechSkill["Delegates to<br/>write-tech-spec"]
+  ProductMd --> TechSkill
+  TechSkill --> TechMd["specs/&lt;issue-slug&gt;/TECH.md"]
+  TechMd --> SpecPR["Specs pull request"]
+  SpecPR --> Review["Human review"]
+  Review --> ImplementLabel
+  ImplementLabel --> ImplementWorkflow["GitHub Actions:<br/>implement-ready-issues.yml"]
+  ImplementWorkflow --> ImplementSkill["Oz implementation agent<br/>.agents/skills/implementation"]
+  ImplementSkill --> ImplementationPR["Implementation pull request"]
+  ImplementationPR --> HumanReview["Human review and merge"]
+```
+
+The diagram shows the implemented portion of the factory today: triage, spec generation, and implementation. Later stages such as automated code review, verification, and monitoring are represented in the product model but are not implemented in this repository yet.
+
 ## Included skills
 
 - `.agents/skills/triage/SKILL.md` — triages issue-tracker issues and applies exactly one implementation-readiness label.
