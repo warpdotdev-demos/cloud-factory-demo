@@ -8,7 +8,7 @@ description: Sets up a beginner-friendly Oz cloud software factory that automati
 Guide a user who is new to Oz through setting up this flow in a GitHub repository:
 
 ```text
-new issue -> Oz triage -> Ready to spec label -> Oz spec -> Ready to implement label -> Oz implementation -> pull request
+new issue -> Oz triage -> Ready to spec label -> Oz spec -> PRODUCT.md + TECH.md PR -> Oz implementation -> pull request
 ```
 
 Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-demo`. Explain each action before taking it, keep secrets out of output and files, and stop at explicit activation checkpoints.
@@ -17,13 +17,13 @@ Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-d
 
 The setup is complete when:
 
-- The target repository contains the `triage`, `spec`, and `implementation` skills.
+- The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, and `implementation` skills.
 - The target repository contains the three Cloud Factory GitHub workflows.
 - The repository has a team-scoped Oz API key stored as the `WARP_API_KEY` Actions secret.
 - The Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests.
 - The setup is committed and pushed to the repository's default branch.
 - A newly opened test issue triggers triage and receives exactly one triage-state label.
-- Applying `Ready to spec` triggers spec work and, for a suitable issue, posts a product and technical spec.
+- Applying `Ready to spec` triggers spec work and, for a suitable issue, opens a PR containing `PRODUCT.md` and `TECH.md`.
 - Applying `Ready to implement` triggers implementation and, for a suitable issue, produces a pull request.
 
 ## Important concepts to explain
@@ -33,7 +33,7 @@ The setup is complete when:
 - **GitHub Actions** provides the event triggers and repository checkout for this demo.
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
 - The triage workflow runs the agent **read-only**: a first job grants the agent only `contents: read` and `issues: read` and has it emit a structured JSON result, and a second deterministic `apply` job (`issues: write`) applies the label and comment to the triggering issue only. The agent never holds issue-write access, so it cannot modify other issues.
-- **Spec** runs when the issue receives a ready-to-spec label and writes a product and technical spec before routing the issue onward.
+- **Spec** runs when the issue receives a ready-to-spec label, delegates spec content to the common `write-product-spec` and `write-tech-spec` skills, and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
 - **Implementation** runs only when the issue receives a ready-to-implement label.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
@@ -59,7 +59,7 @@ If no local checkout exists, ask where the user wants it cloned, then clone it w
 
 If the user is testing installation from a clean state, verify both the local checkout and the remote default branch are clean:
 
-- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
+- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/write-product-spec`, `.agents/skills/write-tech-spec`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
 - Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues`, `Spec Ready Issues`, or `Implement Ready Issues` workflows.
 - Check `gh secret list --repo "$TARGET_REPO"` for an existing `WARP_API_KEY` secret.
 - If any are present, explain that the repository is not a clean activation target. Ask whether to continue against the existing setup or create a fresh test repository.
@@ -158,6 +158,8 @@ The installer must add:
 
 - `.agents/skills/triage/SKILL.md`
 - `.agents/skills/spec/SKILL.md`
+- `.agents/skills/write-product-spec/SKILL.md`
+- `.agents/skills/write-tech-spec/SKILL.md`
 - `.agents/skills/implementation/SKILL.md`
 - `.github/workflows/triage-issues.yml`
 - `.github/workflows/spec-ready-issues.yml`
@@ -166,7 +168,7 @@ The installer must add:
 Review the resulting diff. Explain:
 
 - `triage-issues.yml` triggers when an issue is opened.
-- `spec-ready-issues.yml` triggers when an issue receives a ready-to-spec label.
+- `spec-ready-issues.yml` triggers when an issue receives a ready-to-spec label and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
 - `implement-ready-issues.yml` triggers when an issue receives a ready-to-implement label.
 - The workflows use `warpdotdev/oz-agent-action@v1`.
 - GitHub's token supplies repository permissions; `WARP_API_KEY` authenticates Oz.
@@ -210,7 +212,7 @@ Before activation, review:
 - GitHub Actions workflow permissions, especially whether Actions can create and approve pull requests
 - The four triage labels and routing behavior
 - Expected credit consumption
-- The fact that spec agents can post specs and change readiness labels
+- The fact that spec agents can create branches, open specs PRs, and change readiness labels
 - The fact that implementation agents can push branches and open PRs
 
 Do not commit or push without explicit user approval. The workflows only activate after they are present on the default branch. If the user prefers review first, create a setup branch and pull request, then explain that automation begins after merge.
@@ -242,14 +244,15 @@ If triage applies `Ready to implement` but no implementation workflow starts, ch
 
 ### 7. Test spec work
 
-Before allowing a `Ready to spec` label to trigger spec work, remind the user that this starts another billable run that may post comments and change labels.
+Before allowing a `Ready to spec` label to trigger spec work, remind the user that this starts another billable run that may create a branch, open a specs PR, post comments, and change labels.
 
 Watch the `Spec Ready Issues` workflow. Confirm:
 
 - The spec run starts.
 - The agent posts progress to the issue.
-- The agent posts a product and technical spec.
-- The agent applies `Ready to implement` if the spec has no material open questions, or `Needs info` if human input is still required.
+- The agent creates `PRODUCT.md` and `TECH.md` under a specs directory.
+- The agent opens a specs pull request and links it from the issue.
+- The agent does not apply `Ready to implement` until the specs PR has been reviewed or the repository explicitly treats authored specs as implementation-ready without review.
 
 If spec applies `Ready to implement` but no implementation workflow starts, check whether the label was applied by `github-actions` using GitHub's default token. Account for GitHub's `GITHUB_TOKEN` event suppression in the same way as the triage-to-spec handoff.
 

@@ -1,13 +1,18 @@
 ---
 name: spec
-description: Write a product and technical specification for a GitHub, Jira, Linear, or other issue-tracker issue that has been marked ready-to-spec, using issue context, roadmap and vision documents, and the current codebase.
+description: Coordinate spec-driven development for a GitHub, Jira, Linear, or other issue-tracker issue marked ready-to-spec by using write-product-spec and write-tech-spec, creating PRODUCT.md and TECH.md, opening a pull request, and routing the issue onward.
 ---
 
 # Spec
 
-Write a product and technical specification for the issue passed in the user's prompt. Do not implement the issue.
+Create checked-in product and technical specs for the issue passed in the user's prompt. Do not implement the product change.
 
-Expect the prompt to contain a link, key, or number for exactly one issue in an issue tracker. Use tracker context, roadmap and vision documents, and the current checkout to turn the request into an implementation-ready spec.
+This skill is a thin coordinator around the shared common-skills:
+
+- `.agents/skills/write-product-spec/SKILL.md`
+- `.agents/skills/write-tech-spec/SKILL.md`
+
+Use those skills for the actual PRODUCT.md and TECH.md content. This skill owns issue intake, artifact location, branch/PR handoff, status comments, and readiness labels.
 
 ## Workflow
 
@@ -15,23 +20,32 @@ Expect the prompt to contain a link, key, or number for exactly one issue in an 
 
 Extract the issue URL, key, or number from the prompt. Determine whether it belongs to GitHub Issues, Jira, Linear, or another tracker.
 
-Confirm the current checkout is the repository where the future implementation should happen. If the prompt does not identify one issue unambiguously, ask for clarification before writing a spec.
+Confirm the current checkout is the repository where the future implementation should happen. If the prompt does not identify one issue unambiguously, ask for clarification before writing specs.
 
-### 2. Post a spec-started status comment
+### 2. Verify required spec-writing skills
+
+Confirm these files exist in the checkout:
+
+- `.agents/skills/write-product-spec/SKILL.md`
+- `.agents/skills/write-tech-spec/SKILL.md`
+
+If either file is missing, stop and report that the common spec skills must be installed before spec work can proceed. Do not write substitute specs from memory.
+
+### 3. Post a spec-started status comment
 
 For GitHub Issues, post a short status comment before doing spec work so issue subscribers know an agent has started.
 
 Use the authenticated `gh` CLI when available. Include:
 
 - That automated Oz spec work has started.
-- The issue identifier being specified.
+- That the output will be checked-in `PRODUCT.md` and `TECH.md` files.
 - A follow-along link to the Oz run or Oz session.
 
 Use an Oz run URL or Oz session URL from the agent runtime, action output, environment, or logs. Do not use a GitHub Actions workflow URL as the follow-along link. If no Oz run or session link is available yet, say that the Oz follow-along link is not available yet rather than substituting another URL, and continue spec work.
 
 Keep this comment concise.
 
-### 3. Fetch tracker context
+### 4. Fetch tracker context
 
 Use the best available integration in this order:
 
@@ -47,105 +61,112 @@ Fetch:
 - Attachments, screenshots, logs, reproduction steps, examples, and acceptance criteria
 - Related open issues, likely duplicates, dependencies, and nearby product work
 
-Do not write a spec solely from the issue title. Do not expose credentials or secrets while fetching tracker data.
+Do not write specs solely from the issue title. Do not expose credentials or secrets while fetching tracker data.
 
 If tracker context is missing critical product intent, post a concise blocker comment with the specific missing information and stop instead of inventing requirements.
 
-### 4. Inspect roadmap, vision, and codebase context
+### 5. Choose the spec directory
 
-Read `roadmap.md` and `vision.md` at the repository root if they exist. Use them to confirm the issue fits the stated product direction and to choose constraints or non-goals for the spec.
+Write specs under a dedicated issue directory:
 
-Search and read the codebase to understand the affected feature, behavior, terminology, and likely implementation area.
+```text
+specs/<issue-slug>/PRODUCT.md
+specs/<issue-slug>/TECH.md
+```
 
-Assess:
+Use a stable lowercase slug based on the tracker and issue number, such as `github-123-add-export-options` or `linear-app-321-new-image-export-flow`.
 
-- Current behavior and user-facing flows
-- Likely files, services, UI components, APIs, tests, and data flows involved
-- Existing patterns and abstractions to preserve
-- Product decisions that need human review
-- Technical decisions, edge cases, migrations, compatibility risks, and validation requirements
-- Whether related open issues or active work affect the proposed scope
+Create the `specs/<issue-slug>/` directory if needed. If the repository already has a different established specs directory convention, follow it while still producing files named exactly `PRODUCT.md` and `TECH.md`.
 
-Post a brief progress comment if this investigation reveals a materially useful implementation area or major decision point. Do not post internal reasoning, speculative details, secrets, or raw command output.
+### 6. Write PRODUCT.md with write-product-spec
 
-### 5. Write the spec
+Read `.agents/skills/write-product-spec/SKILL.md` and follow it to write `specs/<issue-slug>/PRODUCT.md`.
 
-Write a concise but implementation-ready spec. Prefer clarity over length. Include enough detail for a separate implementation agent to build the change without re-litigating product decisions.
+Provide the common skill with:
 
-Use this structure:
+- The issue title, description, comments, and linked context
+- `roadmap.md` and `vision.md` if present
+- Any existing product docs, specs, or related issues
+- The chosen output path
 
-## Spec: ISSUE_TITLE
+The product spec should define user-facing behavior, goals, non-goals, acceptance criteria, and open product questions. If material product questions remain, keep them explicit in PRODUCT.md.
 
-### Problem
+### 7. Write TECH.md with write-tech-spec
 
-Describe the user problem and why it matters.
+After PRODUCT.md exists, read `.agents/skills/write-tech-spec/SKILL.md` and follow it to write `specs/<issue-slug>/TECH.md`.
 
-### Goals
+Provide the common skill with:
 
-List the concrete outcomes this change should achieve.
+- The completed PRODUCT.md
+- The issue context and related comments
+- `roadmap.md` and `vision.md` if present
+- Relevant codebase paths, architecture constraints, tests, build commands, and dependencies found during research
+- The chosen output path
 
-### Non-goals
+The technical spec should describe the implementation approach, affected code areas, alternatives considered, validation plan, rollout or migration concerns, and open technical questions.
 
-List related work that should not be included in the implementation.
+### 8. Create a specs pull request
 
-### Product behavior
+Create a descriptive branch such as `spec/issue-123-short-title`.
 
-Describe the expected user-facing behavior, including important states, edge cases, and acceptance criteria.
+Commit only the spec artifacts and any directly necessary documentation changes. Use a clear commit message. When committing, include:
 
-### Technical approach
+`Co-Authored-By: Oz <oz-agent@warp.dev>`
 
-Describe the recommended implementation approach and the code areas likely involved. Include alternatives considered when there are meaningful tradeoffs.
+Push the branch and open a GitHub pull request against the repository's default branch using the authenticated `gh` CLI.
 
-### Validation plan
+The PR description should include:
 
-List the tests, build commands, manual checks, or rollout checks that should validate the implementation.
+- A direct link to the original issue
+- Links to `PRODUCT.md` and `TECH.md`
+- Summary of the product and technical direction
+- Open questions or reviewer decisions needed
+- Whether the specs are ready for implementation after review
 
-### Open questions
+Do not include a closing keyword such as `Closes #123`; the spec PR does not implement the issue.
 
-List only questions that still need human input. If there are no material open questions, write "None."
+### 9. Publish the handoff
 
-### Implementation readiness
+For GitHub Issues, post a final comment on the original issue with:
 
-State whether the issue is ready for implementation after this spec, and if so which label should be applied next.
+- Link to the specs PR
+- Paths to `PRODUCT.md` and `TECH.md`
+- Whether the issue is ready for implementation after spec review
+- Any remaining product or technical questions
 
-### Source context
+If both PRODUCT.md and TECH.md have no material open questions and the specs PR is ready for review, apply a spec-review label if available, such as `spec-ready-for-review`. Keep or remove `Ready to spec` according to the repository's convention.
 
-List the issue, linked discussion, roadmap or vision files, and important code paths used to write the spec.
+Do not apply `Ready to implement` until the spec PR has been reviewed or the repository explicitly treats authored specs as implementation-ready without review.
 
-### 6. Publish the spec
+If permissions prevent creating the branch, opening the PR, commenting, or updating labels, report the completed local artifacts and the permission error.
 
-For GitHub Issues, post the spec as a comment on the original issue using `gh issue comment`.
-
-If the spec has no material open questions and is ready for implementation, apply the matching implementation-readiness label if available, such as `Ready to implement` or `ready-to-implement`, and remove `Ready to spec` or equivalent labels. Preserve unrelated labels.
-
-If the spec still has material open questions, apply or keep a `Needs info` label if available, and explain the questions in the spec. Do not apply `Ready to implement` until those questions are answered.
-
-If permissions prevent commenting or updating labels, report the completed spec and the intended label change in the final response with the permission error.
-
-### 7. Report the result
+### 10. Report the result
 
 Keep the final response concise and include:
 
 - Issue identifier and title
-- Where the spec was posted
-- Whether the issue is ready to implement
-- Exact label changes made or intended
+- Specs PR URL
+- PRODUCT.md path
+- TECH.md path
+- Label changes made or intended
 - Direct link to the issue
 
 Use this format:
 
 ## Spec result
 - **Issue:** [identifier and title](URL)
-- **Spec posted:** URL or location
-- **Implementation readiness:** `ready` or `blocked`
+- **Specs PR:** URL
+- **Product spec:** `specs/<issue-slug>/PRODUCT.md`
+- **Tech spec:** `specs/<issue-slug>/TECH.md`
 - **Label changes:** concise description
 - **Next step:** One concrete action
 
 ## Guardrails
 
-- Do not implement the issue during spec work.
+- Do not implement the product change during spec work.
 - Do not close, assign, reprioritize, or otherwise mutate the issue unless the user asks.
 - Do not overwrite unrelated labels.
-- Do not claim a spec is implementation-ready if material product or technical decisions remain unresolved.
-- Do not post raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in status comments or specs.
-- Post progress sparingly: always post the spec-started comment, then post at most two additional progress comments before the final spec unless blocked or explicitly asked for more updates.
+- Do not claim specs are implementation-ready if material product or technical decisions remain unresolved.
+- Do not post raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in status comments, specs, PR descriptions, or issue comments.
+- Do not write substitute PRODUCT.md or TECH.md content without reading and following the common `write-product-spec` and `write-tech-spec` skills.
+- Post progress sparingly: always post the spec-started comment, then post at most two additional progress comments before the final specs PR unless blocked or explicitly asked for more updates.

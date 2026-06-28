@@ -43,11 +43,14 @@ Fetch:
 
 - Full issue title and description
 - Comments and discussion
+- Links to spec pull requests or checked-in `PRODUCT.md` and `TECH.md` files
 - Existing labels, status, assignee, project, and linked issues
 - Attachments, screenshots, logs, reproduction steps, and acceptance criteria
 - Related open issues, likely duplicates, dependencies, and nearby product work
 
 Do not implement solely from the issue title. Do not expose credentials or secrets while fetching tracker data.
+
+If the issue has linked or checked-in specs, read both `PRODUCT.md` and `TECH.md` before inspecting implementation areas. Treat reviewed specs as the strongest source of acceptance criteria and technical direction, while still checking newer issue comments for corrections.
 
 If tracker context is missing critical implementation details, post a concise blocker comment with the specific missing information and stop instead of guessing.
 
@@ -58,6 +61,7 @@ Search and read the codebase to understand the affected feature, behavior, termi
 Assess:
 
 - Whether the described behavior exists today
+- Whether the requested behavior is already captured in `PRODUCT.md` and `TECH.md`
 - Likely files, services, UI components, APIs, tests, and data flows involved
 - Existing patterns and abstractions to follow
 - Edge cases, migrations, platform differences, or compatibility risks

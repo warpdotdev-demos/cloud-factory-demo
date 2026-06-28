@@ -1,8 +1,9 @@
 name: Spec Ready Issues
 
 # Runs an Oz cloud agent when an issue receives a ready-to-spec label.
-# The agent follows .agents/skills/spec/SKILL.md to write a product and
-# technical spec, post it back to the issue, and update readiness labels.
+# The agent follows .agents/skills/spec/SKILL.md to delegate to the
+# write-product-spec and write-tech-spec common skills, create PRODUCT.md and
+# TECH.md, open a specs PR, and report progress back to the issue.
 
 on:
   issues:
@@ -21,11 +22,14 @@ jobs:
       github.event.label.name == 'ready-to-spec' ||
       github.event.label.name == 'ready to spec'
     permissions:
-      contents: read   # let the agent inspect the checked-out codebase
-      issues: write    # let the agent post the spec and update labels
+      contents: write        # let the agent commit and push a specs branch
+      issues: write          # let the agent post progress and update labels
+      pull-requests: write   # let the agent open the specs PR
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+      - name: Install common spec skills
+        run: npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --agent warp --yes
 
       - name: Spec issue with Oz agent
         uses: warpdotdev/oz-agent-action@v1
@@ -37,7 +41,7 @@ jobs:
           skill: spec
           name: "Spec issue #${{ github.event.issue.number }}"
           prompt: |
-            Write a product and technical spec for the GitHub issue that was just labeled ready to spec.
+            Create checked-in product and technical specs for the GitHub issue that was just labeled ready to spec.
 
             - Repository: ${{ github.repository }}
             - Issue number: #${{ github.event.issue.number }}
@@ -45,16 +49,22 @@ jobs:
             - Applied label: ${{ github.event.label.name }}
 
             Follow the spec skill: fetch the full issue and comments with the
-            authenticated `gh` CLI, read `roadmap.md` and `vision.md` if present,
-            inspect this checked-out codebase, write an implementation-ready
-            product and technical spec, and post it as a comment on the original
-            issue. Post status comments as directed by the skill, using only an
-            Oz run or Oz session URL as the follow-along link. Do not use the
-            GitHub Actions workflow URL as the follow-along link.
+            authenticated `gh` CLI, verify `.agents/skills/write-product-spec`
+            and `.agents/skills/write-tech-spec` are installed, read
+            `roadmap.md` and `vision.md` if present, inspect this checked-out
+            codebase, and use those common skills to create:
 
-            If the completed spec has no material open questions, apply a
-            ready-to-implement label and remove ready-to-spec labels while
-            preserving unrelated labels. If material questions remain, apply or
-            keep a needs-info label instead. Do not implement the issue.
+            - `specs/<issue-slug>/PRODUCT.md`
+            - `specs/<issue-slug>/TECH.md`
+
+            Create a specs branch, commit the spec files, push the branch, and
+            open a GitHub pull request for review. Post status comments as
+            directed by the skill, using only an Oz run or Oz session URL as
+            the follow-along link. Do not use the GitHub Actions workflow URL
+            as the follow-along link.
+
+            Do not implement the issue. Do not apply `Ready to implement`
+            until the specs PR has been reviewed or the repository explicitly
+            treats authored specs as implementation-ready without review.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
