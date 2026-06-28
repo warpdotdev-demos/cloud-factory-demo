@@ -19,8 +19,8 @@ The setup is complete when:
 
 - The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, `validate-changes-match-specs`, and `implementation` skills.
 - The target repository contains the three Cloud Factory GitHub workflows.
-- The repository has a team-scoped Oz API key stored as the `WARP_API_KEY` Actions secret.
-- The Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests.
+- The repository has an Oz API key stored as the `WARP_API_KEY` Actions secret. A team key is preferred for shared automation, but a personal key is supported and may be necessary when creating keys through the Oz CLI.
+- If using a team key, the Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests. If using a personal key, runs authenticate as that user and use that user's GitHub permissions.
 - The setup is committed and pushed to the repository's default branch.
 - A newly opened test issue triggers triage and receives exactly one triage-state label.
 - Applying `Ready to spec` triggers spec work and, for a suitable issue, opens a PR containing `PRODUCT.md` and `TECH.md`.
@@ -149,9 +149,26 @@ Verify these commands are available:
 
 Confirm the user is logged in with `oz whoami`. If not, run `oz login` and let the user complete the interactive login.
 
-#### Create and enable a Warp team when needed
+#### Choose the API key identity
 
-Use `oz whoami` to determine whether the user belongs to the intended Warp team. If they do not have a Warp team, guide them through this setup before continuing:
+Use `oz whoami` to determine whether the user belongs to the intended Warp team and whether this setup should run as a team automation or as the installing user.
+
+Prefer a **team API key** when the repository is owned by a team and the team has GitHub authorization configured. Team keys are best for durable shared automation because runs are not tied to one user's account.
+
+Allow a **personal API key** when:
+
+- The user is testing or demoing the factory.
+- The Oz CLI only supports creating the needed key as a personal key in the user's current environment.
+- Team GitHub authorization is not configured yet, but the user wants runs to use their own GitHub permissions.
+
+When using a personal key, clearly explain:
+
+- Cloud agent runs authenticate as the user who created the key.
+- GitHub writes such as branches and pull requests use that user's permissions and attribution.
+- The user should rotate or remove the key when the demo or experiment is over.
+- A future team setup can replace it with a team key once team GitHub authorization is configured.
+
+If the user wants team-owned automation and does not have a Warp team, guide them through this setup before continuing:
 
 1. Open Warp and go to **Settings > Teams**.
 2. Follow the prompts to create a team and give it a meaningful organization or project name. The creator becomes the team admin.
@@ -159,11 +176,11 @@ Use `oz whoami` to determine whether the user belongs to the intended Warp team.
 4. Have the team admin confirm the team is on a plan that supports cloud agents and Add-on Credits, and that at least 20 credits are available. Do not start automated runs until billing and credit availability are understood.
 5. Have a GitHub organization admin install the [Oz by Warp GitHub App](https://github.com/apps/oz-by-warp) and grant it access to the target repository.
 6. In Warp, have a team admin go to **Settings > Admin Panel > Platform** and add the GitHub organization under **Enabled GitHub Orgs**. This enables team API-key runs to clone the repository, push branches, and open pull requests.
-7. Run `oz whoami` again and verify it shows the intended team before creating team-scoped keys.
+7. Run `oz whoami` again and verify it shows the intended team before creating or storing team keys.
 
 A Warp user can belong to only one team at a time. If the user already belongs to a different team, do not create another or switch teams without explaining the impact and receiving explicit approval.
 
-Treat Oz as enabled for this Cloud Factory only after the team exists, the supported plan and credits are confirmed, the Oz by Warp GitHub App can access the repository, the GitHub organization is enabled in the Admin Panel, and `oz whoami` shows the intended team.
+Treat team-owned Oz automation as enabled for this Cloud Factory only after the team exists, the supported plan and credits are confirmed, the Oz by Warp GitHub App can access the repository, the GitHub organization is enabled in the Admin Panel, and `oz whoami` shows the intended team.
 
 Confirm:
 
@@ -171,9 +188,10 @@ Confirm:
 - GitHub Actions is enabled for the repository.
 - Issues are enabled for the repository.
 - The repository allows GitHub Actions to create and approve pull requests, or the workflow is configured to use a PAT or GitHub App token with `pull-requests: write`.
-- The user belongs to the intended Warp team and can create or request team-scoped resources.
-- The Warp team has Add-on Credits available for cloud runs.
-- Team GitHub authorization is configured for the target repository.
+- For a team-key setup, the user belongs to the intended Warp team and can create or request team-scoped resources.
+- For a personal-key setup, the user understands that runs use their identity, GitHub permissions, and available credits.
+- The relevant account or team has credits available for cloud runs.
+- For a team-key setup, team GitHub authorization is configured for the target repository.
 
 Explain that a run failing with `insufficient_credits` means a team admin must purchase Add-on Credits in the Oz web app or Warp billing settings. Never claim a credit balance was verified unless a tool actually exposed it.
 
@@ -231,18 +249,21 @@ Do not silently customize the installed skills. If the repository has special bu
 
 ### 4. Configure Oz authentication safely
 
-The workflows require a repository Actions secret named `WARP_API_KEY`. It must contain a team-scoped Oz API key so the automation is not tied to an individual account.
+The workflows require a repository Actions secret named `WARP_API_KEY`. It may contain either:
 
-If the user already has an appropriate team key, have them put it into an environment variable without printing it. Then store it and clear the local variable:
+- A **team API key**, preferred for durable shared automation when team GitHub authorization is configured.
+- A **personal API key**, supported for demos, experiments, and cases where the Oz CLI can only create a personal key. Personal-key runs use the creating user's identity, credits, GitHub permissions, and GitHub attribution.
+
+If the user already has an appropriate key, have them put it into an environment variable without printing it. Then store it and clear the local variable:
 
 ```sh
 printf '%s' "$WARP_API_KEY" | gh secret set WARP_API_KEY --repo "$TARGET_REPO"
 unset WARP_API_KEY
 ```
 
-If they need a key, have them use **Settings > Cloud platform > Oz Cloud API Keys** in Warp or the Oz web app, create a key named `cloud-factory-github-actions`, select `Team`, choose an expiration that follows the team's rotation policy, and copy its one-time value into `WARP_API_KEY` without printing it.
+If they need a key, the most explicit path is **Settings > Cloud platform > Oz Cloud API Keys** in Warp or the Oz web app. Create a key named `cloud-factory-github-actions`, choose an expiration appropriate for the demo or automation, and choose `Team` or `Personal` based on the identity decision above. Copy its one-time value into `WARP_API_KEY` without printing it.
 
-If the installed Oz CLI supports team-scoped API-key creation, it is acceptable to create the key with `oz api-key create` instead. First confirm `oz whoami` shows the intended team, then use the team-scoped form exposed by `oz api-key create --help`. When using JSON output, the one-time secret value is currently in the `raw_api_key` field. Pipe or store only that value directly into the GitHub secret.
+If using the Oz CLI to create the key, first run `oz api-key create --help` and use the supported form. If the CLI only supports creating a personal key in the current environment, it is acceptable to use that personal key for this demo. When using JSON output, the one-time secret value is currently in the `raw_api_key` field. Pipe or store only that value directly into the GitHub secret.
 
 After creating a key by any method, verify metadata only, never the raw key value:
 
@@ -250,11 +271,11 @@ After creating a key by any method, verify metadata only, never the raw key valu
 oz api-key list --output-format json
 ```
 
-The key used for automation must show `scope: "Team"`. Plain `oz api-key create` may create a `Personal` key in some CLI versions; do not use that key for this setup. Never fall back to a personal key. If the user cannot create a team key or configure team GitHub authorization, stop and ask a team admin to complete those steps.
+The key used for automation should show the intended scope: `Team` for team-owned automation, or `Personal` for a user-owned demo or CLI-created setup. If a personal key is used, document that choice in the setup summary so future maintainers know the automation depends on that user's account.
 
 Never print, read back, commit, or write the key to a repository file. Confirm only that the `WARP_API_KEY` secret name exists using `gh secret list --repo "$TARGET_REPO"`.
 
-An optional `WARP_AGENT_PROFILE` repository variable may select a preconfigured team Oz Agent Profile. Do not create or set it to a personal profile.
+An optional `WARP_AGENT_PROFILE` repository variable may select a preconfigured Oz Agent Profile. For team-key automation, prefer a team profile. For personal-key demos, a personal profile is acceptable if the user understands it is tied to their account.
 
 ### 5. Review and activate
 
@@ -262,7 +283,7 @@ Before activation, review:
 
 - The complete git diff
 - Workflow permissions
-- The team-scoped API key, team GitHub authorization, and any team Agent Profile
+- The selected API key scope, GitHub authorization model, and any Agent Profile
 - GitHub Actions workflow permissions, especially whether Actions can create and approve pull requests
 - The four triage labels and routing behavior
 - Expected credit consumption
@@ -335,7 +356,8 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 
 - **Workflow is missing:** Confirm all three workflow files are committed to the default branch and Actions is enabled.
 - **`WARP_API_KEY` error:** Confirm the repository secret exists and the key is valid. Never expose its value.
-- **Team key cannot write to GitHub:** Confirm team GitHub authorization is configured for the target repository.
+- **Team key cannot write to GitHub:** Confirm team GitHub authorization is configured for the target repository, or switch to an explicitly user-approved personal key for a demo or user-owned setup.
+- **Personal key writes as the wrong user:** Replace the `WARP_API_KEY` secret with a key created by the intended user, or move to a team key with team GitHub authorization.
 - **`insufficient_credits`:** Direct a team admin to purchase Add-on Credits in Oz or Warp billing settings, then retry.
 - **Permission failure:** Compare the workflow's `permissions` block with the attempted action and check repository or organization Actions policy.
 - **PR creation blocked:** Enable repository or organization Actions settings that allow GitHub Actions to create and approve pull requests, or configure a PAT/GitHub App token with pull request write permission.
@@ -347,7 +369,7 @@ Do not merge the test PR. Present the PR, validation results, Oz run link, and a
 ## Guardrails
 
 - Never reveal, print, or commit API keys or other secrets.
-- Never create or substitute personal Oz API keys, secrets, or Agent Profiles for this setup.
+- Never silently choose an API key identity. Personal Oz API keys and personal Agent Profiles are allowed for demos or user-owned setup, but clearly state that runs use that user's identity, credits, GitHub permissions, and attribution.
 - Never activate workflows, open a test issue, trigger spec work, trigger implementation, or push to the default branch without explaining the consequence and receiving explicit approval.
 - Never weaken repository protections or broaden workflow permissions just to make the demo pass.
 - Never force ambiguous or risky issues into `Ready to implement`.
