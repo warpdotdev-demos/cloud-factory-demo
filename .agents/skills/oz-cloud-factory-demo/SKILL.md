@@ -57,14 +57,50 @@ Resolve the target to:
 
 If no local checkout exists, ask where the user wants it cloned, then clone it with `gh repo clone`. Confirm `gh auth status` succeeds and that the user has permission to manage Actions secrets and push workflow files.
 
-If the user is testing installation from a clean state, verify both the local checkout and the remote default branch are clean:
+Always inventory the target before changing anything. This skill must support both:
 
-- Search the checkout for existing `.agents/skills/triage`, `.agents/skills/spec`, `.agents/skills/write-product-spec`, `.agents/skills/write-tech-spec`, `.agents/skills/validate-changes-match-specs`, `.agents/skills/implementation`, `.github/workflows/triage-issues.yml`, `.github/workflows/spec-ready-issues.yml`, `.github/workflows/implement-ready-issues.yml`, `scripts/bootstrap-cloud-factory.sh`, and Cloud Factory README sections.
-- Check `gh workflow list --repo "$TARGET_REPO"` for existing `Triage New Issues`, `Spec Ready Issues`, or `Implement Ready Issues` workflows.
-- Check `gh secret list --repo "$TARGET_REPO"` for an existing `WARP_API_KEY` secret.
-- If any are present, explain that the repository is not a clean activation target. Ask whether to continue against the existing setup or create a fresh test repository.
+- **Clean installs** for repositories with no Cloud Factory files yet.
+- **Incremental upgrades** for repositories that already followed Part 1 of the Cloud Factory walkthrough and have triage plus implementation installed, but do not yet have the spec flow from Part 2.
 
-Before changing anything, show the user the flow, explain that automated runs consume credits, and ask whether they want to proceed with installation.
+Inspect the local checkout for:
+
+- `.agents/skills/triage/SKILL.md`
+- `.agents/skills/spec/SKILL.md`
+- `.agents/skills/write-product-spec/SKILL.md`
+- `.agents/skills/write-tech-spec/SKILL.md`
+- `.agents/skills/validate-changes-match-specs/SKILL.md`
+- `.agents/skills/implementation/SKILL.md`
+- `.github/workflows/triage-issues.yml`
+- `.github/workflows/spec-ready-issues.yml`
+- `.github/workflows/implement-ready-issues.yml`
+- `roadmap.md`
+- `vision.md`
+- Cloud Factory README sections or other local setup notes
+
+Also inspect the remote repository when possible:
+
+- `gh workflow list --repo "$TARGET_REPO"` for `Triage New Issues`, `Spec Ready Issues`, and `Implement Ready Issues`.
+- `gh secret list --repo "$TARGET_REPO"` for `WARP_API_KEY`.
+- Existing issue labels that correspond to `Ready to implement`, `Ready to spec`, `Needs info`, and `Wait to implement`.
+
+Classify the setup before proceeding:
+
+- **Clean**: none of the Cloud Factory skills or workflows exist.
+- **Part 1 installed**: triage and implementation skills/workflows exist, but spec skill/workflow and common spec skills are missing.
+- **Partial**: some Cloud Factory files exist, but one or more required files for triage, spec, implementation, common spec writing, or spec validation are missing.
+- **Current**: all expected skills, workflows, roadmap, and vision files exist.
+- **Customized**: expected files exist but differ materially from the canonical templates.
+
+Report the classification, the files present, the files missing, and whether `WARP_API_KEY` appears to be configured. Explain that automated runs consume credits and that workflow files only activate after they are present on the default branch.
+
+Before changing anything, ask whether the user wants to:
+
+1. Perform a clean installation.
+2. Upgrade an existing Part 1 setup to add the Part 2 spec flow.
+3. Repair a partial setup by adding missing pieces.
+4. Review differences before overwriting any customized files.
+
+Do not reject an existing setup merely because files are present. Treat existing triage or implementation setup as reusable unless it conflicts with the desired flow.
 
 ### 2. Check prerequisites
 #### Install or verify the Oz CLI
@@ -143,9 +179,9 @@ Explain that a run failing with `insufficient_credits` means a team admin must p
 
 ### 3. Install the skills and workflows
 
-From `TARGET_DIR`, inspect the existing `.agents/skills/` and `.github/workflows/` files first. If the installer would overwrite customized files, show the differences and ask before continuing.
+From `TARGET_DIR`, inspect the existing `.agents/skills/` and `.github/workflows/` files first. If any target file already exists, compare it with the canonical file before overwriting it. Show the differences and ask before replacing customized files.
 
-Run the canonical installer from the target repository root. Prefer downloading it to a temporary file before running it so child commands cannot consume the rest of the script from stdin:
+For a **clean install**, run the canonical installer from the target repository root. Prefer downloading it to a temporary file before running it so child commands cannot consume the rest of the script from stdin:
 
 ```sh
 tmp_installer="$(mktemp)"
@@ -153,8 +189,7 @@ curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo
 bash "$tmp_installer"
 rm "$tmp_installer"
 ```
-
-The installer must add:
+The installer should add:
 
 - `.agents/skills/triage/SKILL.md`
 - `.agents/skills/spec/SKILL.md`
@@ -165,6 +200,24 @@ The installer must add:
 - `.github/workflows/triage-issues.yml`
 - `.github/workflows/spec-ready-issues.yml`
 - `.github/workflows/implement-ready-issues.yml`
+
+For an **incremental Part 1 → Part 2 upgrade**, do not blindly rerun the installer if it would overwrite customized triage or implementation files. Add or update only the missing spec-flow pieces:
+
+```sh
+npx skills add warpdotdev-demos/cloud-factory-demo --skill spec --agent warp --yes
+npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --skill validate-changes-match-specs --agent warp --yes
+mkdir -p .github/workflows
+curl -fsSL https://raw.githubusercontent.com/warpdotdev-demos/cloud-factory-demo/main/templates/github/workflows/spec-ready-issues.yml -o .github/workflows/spec-ready-issues.yml
+```
+
+Then compare the existing local files against the current canonical versions and ask before updating them:
+
+- `.agents/skills/triage/SKILL.md` may need the Part 2 readiness logic that uses `roadmap.md` and `vision.md` to decide when to return `Ready to spec`.
+- `.agents/skills/implementation/SKILL.md` may need the Part 2 logic that reads `PRODUCT.md` and `TECH.md` before implementation and runs `validate-changes-match-specs` after implementation.
+- `.github/workflows/implement-ready-issues.yml` may need the step that installs `validate-changes-match-specs` before running the implementation agent.
+- `roadmap.md` and `vision.md` should be added if they do not already exist, because the Part 2 triage flow relies on them.
+
+For a **partial setup repair**, install or copy only missing required pieces when possible. If a file exists but is incomplete or outdated, show a diff against the canonical template and get approval before overwriting.
 
 Review the resulting diff. Explain:
 
@@ -223,6 +276,14 @@ After activation, confirm all three workflows appear with:
 ```sh
 gh workflow list --repo "$TARGET_REPO"
 ```
+
+If this was an incremental Part 1 → Part 2 upgrade, also confirm:
+
+- Existing triage and implementation files were preserved unless the user approved updates.
+- `.github/workflows/spec-ready-issues.yml` was added.
+- `.agents/skills/spec/SKILL.md`, `.agents/skills/write-product-spec/SKILL.md`, `.agents/skills/write-tech-spec/SKILL.md`, and `.agents/skills/validate-changes-match-specs/SKILL.md` exist.
+- `roadmap.md` and `vision.md` exist or the user explicitly chose to defer adding them.
+- The triage skill can return `Ready to spec` for issues that match the roadmap and vision but are too ambiguous or complex to one-shot.
 
 ### 6. Test triage first
 
