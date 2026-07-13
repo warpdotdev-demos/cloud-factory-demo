@@ -25,12 +25,42 @@ HUNK_HEADER_PATTERN = re.compile(
 )
 
 
+def _is_file_header_line(raw_line: str) -> bool:
+    """Return True for unified-diff file metadata that is not hunk content."""
+    return (
+        raw_line.startswith("diff --git ")
+        or raw_line.startswith("index ")
+        or raw_line.startswith("--- ")
+        or raw_line.startswith("+++ ")
+        or raw_line.startswith("new file mode ")
+        or raw_line.startswith("deleted file mode ")
+        or raw_line.startswith("old mode ")
+        or raw_line.startswith("new mode ")
+        or raw_line.startswith("similarity index ")
+        or raw_line.startswith("dissimilarity index ")
+        or raw_line.startswith("rename from ")
+        or raw_line.startswith("rename to ")
+        or raw_line.startswith("copy from ")
+        or raw_line.startswith("copy to ")
+        or raw_line.startswith("Binary files ")
+    )
+
+
 def annotate_patch(patch: str) -> str:
     lines: list[str] = []
     old_line: int | None = None
     new_line: int | None = None
 
     for raw_line in patch.splitlines():
+        # Full multi-file `git diff` output interleaves file headers between
+        # hunks. Reset line counters on those headers so `---` / `+++` are not
+        # treated as deleted/added content from the previous file's hunk.
+        if _is_file_header_line(raw_line):
+            old_line = None
+            new_line = None
+            lines.append(raw_line)
+            continue
+
         header_match = HUNK_HEADER_PATTERN.match(raw_line)
         if header_match:
             old_line = int(header_match.group("old_start"))
