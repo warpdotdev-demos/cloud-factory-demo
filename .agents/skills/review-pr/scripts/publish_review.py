@@ -205,16 +205,46 @@ def main() -> int:
     if "GH_TOKEN" not in env and "GITHUB_TOKEN" in env:
         env["GH_TOKEN"] = env["GITHUB_TOKEN"]
 
-    cmd = [
-        "gh",
-        "api",
-        "--method",
-        "POST",
-        f"repos/{repo}/pulls/{pr_number}/reviews",
-        "--input",
-        str(payload_path),
-    ]
-    result = subprocess.run(cmd, env=env, check=False, capture_output=True, text=True)
+    def post_review(event_name: str) -> subprocess.CompletedProcess[str]:
+        payload["event"] = event_name
+        payload_path.write_text(json.dumps(payload), encoding="utf-8")
+        return subprocess.run(
+            [
+                "gh",
+                "api",
+                "--method",
+                "POST",
+                f"repos/{repo}/pulls/{pr_number}/reviews",
+                "--input",
+                str(payload_path),
+            ],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    result = post_review(event)
+    published_event = event
+
+    # Many repositories leave the default Actions setting that blocks
+    # GITHUB_TOKEN from approving pull requests. In that case still publish the
+    # review body and inline comments as a plain COMMENT so the factory does not
+    # fail after a successful agent review.
+    if result.returncode != 0 and event == "APPROVE":
+        combined = f"{result.stdout}\n{result.stderr}".lower()
+        if (
+            "not permitted to approve" in combined
+            or "can not approve" in combined
+            or "cannot approve" in combined
+        ):
+            print(
+                "APPROVE is not permitted for this token; falling back to COMMENT",
+                file=sys.stderr,
+            )
+            result = post_review("COMMENT")
+            published_event = "COMMENT"
+
     if result.returncode != 0:
         sys.stderr.write(result.stdout)
         sys.stderr.write(result.stderr)
@@ -222,7 +252,7 @@ def main() -> int:
 
     print(
         f"published review for {repo}#{pr_number}: "
-        f"event={event}, comments={len(comments)}, verdict={verdict}"
+        f"event={published_event}, comments={len(comments)}, verdict={verdict}"
     )
     return 0
 

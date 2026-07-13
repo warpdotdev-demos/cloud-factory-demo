@@ -7,8 +7,10 @@ name: Review Pull Requests
 # against the annotated diff and posts the GitHub review.
 #
 # Setup: the WARP_API_KEY repository secret must be set (the Oz API key).
-# Repository or organization settings must allow GitHub Actions to create
-# and approve pull requests if APPROVE events should succeed.
+# Optional: enable "Allow GitHub Actions to create and approve pull requests"
+# in the repository/organization Actions settings if APPROVE review events
+# should succeed. Otherwise publish_review.py falls back to COMMENT for
+# approvals while still posting the review body and inline comments.
 
 on:
   pull_request:
