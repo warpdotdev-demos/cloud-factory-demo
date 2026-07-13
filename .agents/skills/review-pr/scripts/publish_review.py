@@ -199,7 +199,6 @@ def main() -> int:
     }
 
     payload_path = Path("review_publish_payload.json")
-    payload_path.write_text(json.dumps(payload), encoding="utf-8")
 
     env = os.environ.copy()
     if "GH_TOKEN" not in env and "GITHUB_TOKEN" in env:
@@ -224,37 +223,43 @@ def main() -> int:
             text=True,
         )
 
-    result = post_review(event)
-    published_event = event
+    try:
+        result = post_review(event)
+        published_event = event
 
-    # Many repositories leave the default Actions setting that blocks
-    # GITHUB_TOKEN from approving pull requests. In that case still publish the
-    # review body and inline comments as a plain COMMENT so the factory does not
-    # fail after a successful agent review.
-    if result.returncode != 0 and event == "APPROVE":
-        combined = f"{result.stdout}\n{result.stderr}".lower()
-        if (
-            "not permitted to approve" in combined
-            or "can not approve" in combined
-            or "cannot approve" in combined
-        ):
-            print(
-                "APPROVE is not permitted for this token; falling back to COMMENT",
-                file=sys.stderr,
-            )
-            result = post_review("COMMENT")
-            published_event = "COMMENT"
+        # Many repositories leave the default Actions setting that blocks
+        # GITHUB_TOKEN from approving pull requests. In that case still publish the
+        # review body and inline comments as a plain COMMENT so the factory does not
+        # fail after a successful agent review.
+        if result.returncode != 0 and event == "APPROVE":
+            combined = f"{result.stdout}\n{result.stderr}".lower()
+            if (
+                "not permitted to approve" in combined
+                or "can not approve" in combined
+                or "cannot approve" in combined
+            ):
+                print(
+                    "APPROVE is not permitted for this token; falling back to COMMENT",
+                    file=sys.stderr,
+                )
+                result = post_review("COMMENT")
+                published_event = "COMMENT"
 
-    if result.returncode != 0:
-        sys.stderr.write(result.stdout)
-        sys.stderr.write(result.stderr)
-        raise SystemExit("publish failed: gh api request failed")
+        if result.returncode != 0:
+            sys.stderr.write(result.stdout)
+            sys.stderr.write(result.stderr)
+            raise SystemExit("publish failed: gh api request failed")
 
-    print(
-        f"published review for {repo}#{pr_number}: "
-        f"event={published_event}, comments={len(comments)}, verdict={verdict}"
-    )
-    return 0
+        print(
+            f"published review for {repo}#{pr_number}: "
+            f"event={published_event}, comments={len(comments)}, verdict={verdict}"
+        )
+        return 0
+    finally:
+        try:
+            payload_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 if __name__ == "__main__":

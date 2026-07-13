@@ -11,6 +11,9 @@ name: Review Pull Requests
 # in the repository/organization Actions settings if APPROVE review events
 # should succeed. Otherwise publish_review.py falls back to COMMENT for
 # approvals while still posting the review body and inline comments.
+#
+# review.json is passed between jobs via an artifact rather than a job output
+# so large reviews are not truncated by GitHub Actions' ~1 MB output limit.
 
 on:
   pull_request:
@@ -28,8 +31,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-    outputs:
-      review_result: ${{ steps.review.outputs.agent_output }}
     steps:
       - name: Checkout pull request head
         uses: actions/checkout@v4
@@ -131,48 +132,45 @@ jobs:
             If `spec_context.md` only says no context was found, you may regenerate it with:
             `python3 .agents/skills/review-pr/scripts/resolve_spec_context.py --repo ${{ github.repository }} --pr ${{ github.event.pull_request.number }} --output spec_context.md`
 
-            Review the PR, write `review.json`, and validate it with:
+            Review the PR, write `review.json` to the working directory, and validate it with:
             `python3 .agents/skills/review-pr/scripts/validate_review_json.py --review-json review.json --diff pr_diff.txt`
 
-            Do not post the review to GitHub. Your final response must be the raw `review.json` object with no surrounding prose or markdown fences.
+            Do not post the review to GitHub. Leave the validated `review.json` file in the working directory. Your final response may restate the JSON, but the on-disk `review.json` file is required.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
 
-  publish:
-    name: Publish review
-    needs: review
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: write
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download review inputs
-        uses: actions/download-artifact@v4
-        with:
-          name: review-inputs-pr-${{ github.event.pull_request.number }}
-
-      - name: Extract and publish review.json
+      - name: Materialize review.json
         env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          REVIEW_RESULT: ${{ needs.review.outputs.review_result }}
+          REVIEW_RESULT: ${{ steps.review.outputs.agent_output }}
         run: |
           set -euo pipefail
 
+          # Prefer the on-disk artifact written by the agent so large reviews are
+          # not limited by GitHub Actions job-output size.
+          if [ -f review.json ]; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("review.json").read_text(encoding="utf-8"))
+          if not isinstance(payload, dict) or "verdict" not in payload or "comments" not in payload:
+              raise SystemExit("review.json exists but is missing required verdict/comments fields")
+          print(
+              f"Using on-disk review.json "
+              f"(verdict={payload.get('verdict')}, comments={len(payload.get('comments') or [])})"
+          )
+          PY
+            exit 0
+          fi
+
           if [ -z "${REVIEW_RESULT:-}" ]; then
-            echo "::error::Review job produced no output; nothing to publish." >&2
+            echo "::error::Review job produced neither review.json nor agent output." >&2
             exit 1
           fi
 
           printf '%s' "$REVIEW_RESULT" > raw_output.txt
 
-          # The action returns the agent's full final response, which may
-          # include prose around the JSON. Extract the last review-result
-          # object (the one carrying "verdict"/"comments") into review.json.
+          # Fallback: extract the last review-result object from the agent output.
           if ! python3 - raw_output.txt > review.json <<'PY'
           import json, sys
 
@@ -198,6 +196,53 @@ jobs:
           then
             echo "::error::Could not find a review JSON object in the agent output. Raw output:" >&2
             cat raw_output.txt >&2
+            exit 1
+          fi
+
+          echo "Materialized review.json from agent output fallback"
+
+      - name: Upload review result
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-result-pr-${{ github.event.pull_request.number }}
+          path: review.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish review
+    needs: review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download review inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: review-inputs-pr-${{ github.event.pull_request.number }}
+
+      - name: Download review result
+        uses: actions/download-artifact@v4
+        with:
+          name: review-result-pr-${{ github.event.pull_request.number }}
+
+      - name: Publish review.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f review.json ]; then
+            echo "::error::review.json artifact is missing." >&2
+            exit 1
+          fi
+          if [ ! -f pr_diff.txt ]; then
+            echo "::error::pr_diff.txt artifact is missing." >&2
             exit 1
           fi
 

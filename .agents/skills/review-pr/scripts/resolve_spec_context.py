@@ -575,6 +575,7 @@ def resolve_issue_number_for_pr(
         + _issue_numbers_from_text(f"{title}\n{body}")
     )
 
+    linked: list[dict[str, Any]] = []
     if token:
         linked = _fetch_closing_issue_references(owner, repo, int(pr["number"]), token=token)
         linked.extend(
@@ -592,10 +593,6 @@ def resolve_issue_number_for_pr(
         _issue_numbers_from_branch(head_ref) + _issue_numbers_from_changed_files(changed_files)
     )
     if token:
-        linked = _fetch_closing_issue_references(owner, repo, int(pr["number"]), token=token)
-        linked.extend(
-            _fetch_manual_linked_issue_references(owner, repo, int(pr["number"]), token=token)
-        )
         preferred = _dedupe_ints(preferred + _same_repo_issue_numbers(owner, repo, linked))
     if len(preferred) == 1:
         return preferred[0]
