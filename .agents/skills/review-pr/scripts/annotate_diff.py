@@ -25,37 +25,19 @@ HUNK_HEADER_PATTERN = re.compile(
 )
 
 
-def _is_file_header_line(raw_line: str) -> bool:
-    """Return True for unified-diff file metadata that is not hunk content."""
-    return (
-        raw_line.startswith("diff --git ")
-        or raw_line.startswith("index ")
-        or raw_line.startswith("--- ")
-        or raw_line.startswith("+++ ")
-        or raw_line.startswith("new file mode ")
-        or raw_line.startswith("deleted file mode ")
-        or raw_line.startswith("old mode ")
-        or raw_line.startswith("new mode ")
-        or raw_line.startswith("similarity index ")
-        or raw_line.startswith("dissimilarity index ")
-        or raw_line.startswith("rename from ")
-        or raw_line.startswith("rename to ")
-        or raw_line.startswith("copy from ")
-        or raw_line.startswith("copy to ")
-        or raw_line.startswith("Binary files ")
-    )
-
-
 def annotate_patch(patch: str) -> str:
     lines: list[str] = []
     old_line: int | None = None
     new_line: int | None = None
 
     for raw_line in patch.splitlines():
-        # Full multi-file `git diff` output interleaves file headers between
-        # hunks. Reset line counters on those headers so `---` / `+++` are not
-        # treated as deleted/added content from the previous file's hunk.
-        if _is_file_header_line(raw_line):
+        # Full multi-file `git diff` output starts each file with `diff --git`.
+        # Reset hunk counters there so later `---` / `+++` headers pass through
+        # the not-in-hunk branch instead of being treated as deleted/added lines.
+        # Do not special-case `---` / `+++` themselves: a deleted content line
+        # whose text begins with `-- ` is also written as `--- ...` in unified
+        # diffs and must still be annotated as hunk content when inside a hunk.
+        if raw_line.startswith("diff --git ") or raw_line.startswith("Binary files "):
             old_line = None
             new_line = None
             lines.append(raw_line)
