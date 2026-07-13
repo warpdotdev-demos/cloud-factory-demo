@@ -1,0 +1,102 @@
+name: Improve Review PR Skill
+
+# Daily outer loop over automated code review:
+# 1. Collect human reactions to review-pr comments from the last day
+# 2. Run an Oz agent with the improve-review-pr skill
+# 3. If durable organizational knowledge is found, open a PR updating the review skill
+#
+# Setup:
+# - WARP_API_KEY repository secret must be set
+# - Repository settings must allow GitHub Actions to create pull requests
+
+on:
+  schedule:
+    # 13:00 UTC daily
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+    inputs:
+      since_hours:
+        description: "How many hours of review feedback to inspect"
+        required: false
+        default: "24"
+
+concurrency:
+  group: improve-review-pr
+  cancel-in-progress: false
+
+jobs:
+  improve:
+    name: Improve review-pr from human feedback
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect review feedback corpus
+        id: collect
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SINCE_HOURS: ${{ github.event.inputs.since_hours || '24' }}
+        run: |
+          set -euo pipefail
+
+          python3 .agents/skills/improve-review-pr/scripts/collect_review_feedback.py \
+            --repo "${REPO}" \
+            --since-hours "${SINCE_HOURS}" \
+            --output feedback_corpus.json
+
+          echo "summary<<EOF" >> "$GITHUB_OUTPUT"
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          data = json.loads(Path("feedback_corpus.json").read_text(encoding="utf-8"))
+          summary = data.get("summary") or {}
+          print(
+              f"PRs inspected: {summary.get('prs_inspected', 0)}; "
+              f"validated={summary.get('validated', 0)}, "
+              f"corrected={summary.get('corrected', 0)}, "
+              f"refined={summary.get('refined', 0)}, "
+              f"ambiguous={summary.get('ambiguous', 0)}"
+          )
+          PY
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Upload feedback corpus
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-feedback-corpus
+          path: feedback_corpus.json
+          if-no-files-found: error
+
+      - name: Improve review skill with Oz agent
+        uses: warpdotdev/oz-agent-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          skill: improve-review-pr
+          name: "Improve review-pr from last-day feedback"
+          prompt: |
+            Use the Improve Review PR skill to run the daily outer loop over automated code-review feedback.
+
+            First read `.agents/skills/improve-review-pr/SKILL.md`, then follow it exactly.
+
+            - Repository: ${{ github.repository }}
+            - Lookback window: ${{ github.event.inputs.since_hours || '24' }} hours
+            - Feedback corpus already prepared at `feedback_corpus.json`
+            - Feedback summary: ${{ steps.collect.outputs.summary }}
+
+            Analyze the corpus, synthesize durable organizational knowledge, and only if warranted:
+            update `.agents/skills/review-pr/SKILL.md` and/or create/update
+            `.agents/skills/review-pr-local/SKILL.md`, then open a pull request with those skill changes.
+
+            Do not change product code. Do not open a PR if there is no durable learning.
+            End with the report format required by the skill.
+          warp_api_key: ${{ secrets.WARP_API_KEY }}
+          profile: ${{ vars.WARP_AGENT_PROFILE || '' }}

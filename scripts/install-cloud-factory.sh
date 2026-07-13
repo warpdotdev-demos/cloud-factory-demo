@@ -19,7 +19,7 @@ fi
 
 # Keep npx from consuming the rest of this script when users install with
 # `curl ... | bash`.
-npx skills add "${REPO}" --skill triage --skill spec --skill implementation --skill review-pr --agent warp --yes < /dev/null
+npx skills add "${REPO}" --skill triage --skill spec --skill implementation --skill review-pr --skill improve-review-pr --agent warp --yes < /dev/null
 npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --skill validate-changes-match-specs --agent warp --yes < /dev/null
 
 mkdir -p .github/workflows
@@ -27,6 +27,7 @@ curl -fsSL "${RAW_BASE}/templates/github/workflows/triage-issues.yml" -o .github
 curl -fsSL "${RAW_BASE}/templates/github/workflows/spec-ready-issues.yml" -o .github/workflows/spec-ready-issues.yml
 curl -fsSL "${RAW_BASE}/templates/github/workflows/implement-ready-issues.yml" -o .github/workflows/implement-ready-issues.yml
 curl -fsSL "${RAW_BASE}/templates/github/workflows/review-pull-requests.yml" -o .github/workflows/review-pull-requests.yml
+curl -fsSL "${RAW_BASE}/templates/github/workflows/improve-review-pr.yml" -o .github/workflows/improve-review-pr.yml
 
 printf 'Installed Cloud Factory skills and GitHub Actions workflow templates from %s@%s.\n' "${REPO}" "${REF}"
 printf 'Ensure the WARP_API_KEY GitHub Actions secret is configured before enabling these workflows.\n'

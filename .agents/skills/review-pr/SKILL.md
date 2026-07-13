@@ -89,6 +89,8 @@ When proposing a code change, use:
 <replacement code here>
 ```
 
+Before recommending a suggestion or claiming a bug, use the local checkout as a real coding agent: apply or otherwise exercise the hypothesized fix and validate it with the repository's available build, typecheck, lint, or targeted tests so the change compiles and does not introduce an obvious new failure. Prefer validated suggestions over speculative ones; if you cannot validate a fix, say so and avoid presenting untested code as ready to accept.
+
 Rules:
 
 - Match the exact indentation of the original file.
