@@ -1,0 +1,253 @@
+name: Review Pull Requests
+
+# Reviews an opened or updated pull request with an Oz cloud agent.
+#
+# The agent runs with read-only GitHub permissions and writes structured
+# findings to review.json. A separate publish job validates that artifact
+# against the annotated diff and posts the GitHub review.
+#
+# Setup: the WARP_API_KEY repository secret must be set (the Oz API key).
+# Optional: enable "Allow GitHub Actions to create and approve pull requests"
+# in the repository/organization Actions settings if APPROVE review events
+# should succeed. Otherwise publish_review.py falls back to COMMENT for
+# approvals while still posting the review body and inline comments.
+#
+# review.json is passed between jobs via an artifact rather than a job output
+# so large reviews are not truncated by GitHub Actions' ~1 MB output limit.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+concurrency:
+  group: review-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review pull request
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Prepare review artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          git fetch --no-tags origin \
+            "${BASE_SHA}" \
+            "${HEAD_SHA}"
+
+          # Prefer the three-dot PR range so the annotated diff matches GitHub's
+          # pull request file view as closely as possible.
+          git diff --find-renames "${BASE_SHA}...${HEAD_SHA}" > raw_diff.txt
+
+          python3 .agents/skills/review-pr/scripts/annotate_diff.py \
+            --input raw_diff.txt \
+            --output pr_diff.txt
+
+          gh pr view "${PR_NUMBER}" --repo "${REPO}" --json title,body,baseRefName,headRefName,author,url > pr_meta.json
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          meta = json.loads(Path("pr_meta.json").read_text(encoding="utf-8"))
+          body = (meta.get("body") or "").strip() or "No description provided."
+          author = ((meta.get("author") or {}).get("login") or "unknown")
+          pr_number = os.environ["PR_NUMBER"]
+          text = (
+              f"# Pull Request #{pr_number}\n\n"
+              f"- Title: {meta.get('title') or ''}\n"
+              f"- Base branch: {meta.get('baseRefName') or ''}\n"
+              f"- Head branch: {meta.get('headRefName') or ''}\n"
+              f"- Author: {author}\n"
+              f"- URL: {meta.get('url') or ''}\n\n"
+              f"## Body\n\n{body}\n"
+          )
+          Path("pr_description.txt").write_text(text, encoding="utf-8")
+          PY
+
+          python3 .agents/skills/review-pr/scripts/resolve_spec_context.py \
+            --repo "${REPO}" \
+            --pr "${PR_NUMBER}" \
+            --workspace "${GITHUB_WORKSPACE}" \
+            --output spec_context.md || true
+
+          if [ ! -s spec_context.md ]; then
+            printf 'No approved or repository spec context was found for this PR.\n' > spec_context.md
+          fi
+
+          echo "Prepared review artifacts:"
+          wc -l raw_diff.txt pr_diff.txt pr_description.txt spec_context.md
+
+      - name: Upload review inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-inputs-pr-${{ github.event.pull_request.number }}
+          path: |
+            pr_diff.txt
+            pr_description.txt
+            spec_context.md
+          if-no-files-found: error
+
+      - name: Review with Oz agent
+        uses: warpdotdev/oz-agent-action@v1
+        id: review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          skill: review-pr
+          name: "Review PR #${{ github.event.pull_request.number }}"
+          prompt: |
+            Review GitHub pull request #${{ github.event.pull_request.number }} in this repository using the review-pr skill.
+
+            First read `.agents/skills/review-pr/SKILL.md`, then follow it exactly.
+
+            - Repository: ${{ github.repository }}
+            - Pull request URL: ${{ github.event.pull_request.html_url }}
+            - Base branch: ${{ github.event.pull_request.base.ref }}
+            - Head branch: ${{ github.event.pull_request.head.ref }}
+            - Head SHA: ${{ github.event.pull_request.head.sha }}
+
+            Local review artifacts are already prepared in the working directory:
+            - `pr_diff.txt`: annotated PR diff
+            - `pr_description.txt`: PR metadata and description
+            - `spec_context.md`: product/tech specs when resolvable
+
+            If `spec_context.md` only says no context was found, you may regenerate it with:
+            `python3 .agents/skills/review-pr/scripts/resolve_spec_context.py --repo ${{ github.repository }} --pr ${{ github.event.pull_request.number }} --output spec_context.md`
+
+            Review the PR, write `review.json` to the working directory, and validate it with:
+            `python3 .agents/skills/review-pr/scripts/validate_review_json.py --review-json review.json --diff pr_diff.txt`
+
+            Do not post the review to GitHub. Leave the validated `review.json` file in the working directory. Your final response may restate the JSON, but the on-disk `review.json` file is required.
+          warp_api_key: ${{ secrets.WARP_API_KEY }}
+          profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+
+      - name: Materialize review.json
+        env:
+          REVIEW_RESULT: ${{ steps.review.outputs.agent_output }}
+        run: |
+          set -euo pipefail
+
+          # Prefer the on-disk artifact written by the agent so large reviews are
+          # not limited by GitHub Actions job-output size.
+          if [ -f review.json ]; then
+            python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("review.json").read_text(encoding="utf-8"))
+          if not isinstance(payload, dict) or "verdict" not in payload or "comments" not in payload:
+              raise SystemExit("review.json exists but is missing required verdict/comments fields")
+          print(
+              f"Using on-disk review.json "
+              f"(verdict={payload.get('verdict')}, comments={len(payload.get('comments') or [])})"
+          )
+          PY
+            exit 0
+          fi
+
+          if [ -z "${REVIEW_RESULT:-}" ]; then
+            echo "::error::Review job produced neither review.json nor agent output." >&2
+            exit 1
+          fi
+
+          printf '%s' "$REVIEW_RESULT" > raw_output.txt
+
+          # Fallback: extract the last review-result object from the agent output.
+          if ! python3 - raw_output.txt > review.json <<'PY'
+          import json, sys
+
+          text = open(sys.argv[1], encoding="utf-8").read()
+          decoder = json.JSONDecoder()
+          last_obj = last_review = None
+          for i, ch in enumerate(text):
+              if ch != "{":
+                  continue
+              try:
+                  obj, _ = decoder.raw_decode(text[i:])
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(obj, dict):
+                  last_obj = obj
+                  if "verdict" in obj and "comments" in obj:
+                      last_review = obj
+          result = last_review if last_review is not None else last_obj
+          if result is None:
+              sys.exit(1)
+          json.dump(result, sys.stdout)
+          PY
+          then
+            echo "::error::Could not find a review JSON object in the agent output. Raw output:" >&2
+            cat raw_output.txt >&2
+            exit 1
+          fi
+
+          echo "Materialized review.json from agent output fallback"
+
+      - name: Upload review result
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-result-pr-${{ github.event.pull_request.number }}
+          path: review.json
+          if-no-files-found: error
+
+  publish:
+    name: Publish review
+    needs: review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download review inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: review-inputs-pr-${{ github.event.pull_request.number }}
+
+      - name: Download review result
+        uses: actions/download-artifact@v4
+        with:
+          name: review-result-pr-${{ github.event.pull_request.number }}
+
+      - name: Publish review.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+
+          if [ ! -f review.json ]; then
+            echo "::error::review.json artifact is missing." >&2
+            exit 1
+          fi
+          if [ ! -f pr_diff.txt ]; then
+            echo "::error::pr_diff.txt artifact is missing." >&2
+            exit 1
+          fi
+
+          python3 .agents/skills/review-pr/scripts/publish_review.py \
+            --review-json review.json \
+            --diff pr_diff.txt \
+            --repo "${REPO}" \
+            --pr "${PR_NUMBER}"

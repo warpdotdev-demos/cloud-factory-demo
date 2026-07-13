@@ -36,10 +36,18 @@ flowchart LR
   ImplementWorkflow --> ImplementSkill["Oz implementation agent<br/>.agents/skills/implementation"]
   ImplementSkill --> ValidateSkill["Validates against specs<br/>validate-changes-match-specs"]
   ValidateSkill --> ImplementationPR["Implementation pull request"]
-  ImplementationPR --> HumanReview["Human review and merge"]
+  ImplementationPR --> ReviewWorkflow["GitHub Actions:<br/>review-pull-requests.yml"]
+  ReviewWorkflow --> ReviewSkill["Oz review agent<br/>.agents/skills/review-pr"]
+  ReviewSkill --> ReviewJson["review.json"]
+  ReviewJson --> PublishReview["Publish job posts<br/>GitHub PR review"]
+  PublishReview --> HumanReview["Human review and merge"]
+  HumanReview --> ImproveWorkflow["Daily GitHub Actions:<br/>improve-review-pr.yml"]
+  ImproveWorkflow --> ImproveSkill["Oz improve-review-pr agent"]
+  ImproveSkill --> SkillPR["Optional skill-update PR"]
+  SkillPR --> ReviewSkill
 ```
 
-The diagram shows the implemented portion of the factory today: triage, spec generation, and implementation. Later stages such as automated code review, verification, and monitoring are represented in the product model but are not implemented in this repository yet.
+The diagram shows the implemented portion of the factory today: triage, spec generation, implementation, automated code review, and a daily outer loop that improves the review skill from human feedback. Later stages such as verification and monitoring are represented in the product model but are not implemented in this repository yet.
 
 ## Included skills
 
@@ -49,6 +57,8 @@ The diagram shows the implemented portion of the factory today: triage, spec gen
 - `.agents/skills/write-tech-spec/SKILL.md` — installed from `warpdotdev/common-skills`; writes the technical spec artifact after `PRODUCT.md`.
 - `.agents/skills/validate-changes-match-specs/SKILL.md` — installed from `warpdotdev/common-skills`; checks implementation diffs against `PRODUCT.md` and `TECH.md` when specs exist.
 - `.agents/skills/implementation/SKILL.md` — implements a ready issue, validates the change, opens a PR, and reports progress back to the original issue.
+- `.agents/skills/review-pr/SKILL.md` — reviews a pull request against an annotated diff and optional `PRODUCT.md`/`TECH.md` specs, writing structured findings to `review.json` for a workflow to publish.
+- `.agents/skills/improve-review-pr/SKILL.md` — daily outer loop that synthesizes human reactions to automated review comments and opens a PR to update review guidance when durable organizational knowledge is found.
 - `.agents/skills/oz-cloud-factory-demo/SKILL.md` — walks a user who is new to Oz through installing, configuring, activating, and testing the triage-to-implementation factory in a repository of their choice.
 
 ## Included GitHub Actions workflows
@@ -58,6 +68,8 @@ This repo keeps workflow templates in `templates/github/workflows/` so they can 
 - `templates/github/workflows/triage-issues.yml` — runs Oz triage when a new GitHub issue is opened.
 - `templates/github/workflows/spec-ready-issues.yml` — runs Oz spec work when an issue receives a `Ready to spec` label and opens a PR with `PRODUCT.md` and `TECH.md`.
 - `templates/github/workflows/implement-ready-issues.yml` — runs Oz implementation when an issue receives a `Ready to implement` label.
+- `templates/github/workflows/review-pull-requests.yml` — runs Oz code review when a non-draft pull request is opened or updated, then publishes the resulting GitHub review.
+- `templates/github/workflows/improve-review-pr.yml` — daily (and manual) outer loop that inspects human feedback on automated reviews and may open a skill-improvement PR.
 
 The `.github/workflows/` directory contains the same workflows for this repo to exercise and document the templates.
 
@@ -74,7 +86,7 @@ rm "$tmp_installer"
 
 The installer:
 
-1. Installs the `triage`, `spec`, and `implementation` skills from this canonical repo with `npx skills add`.
+1. Installs the `triage`, `spec`, `implementation`, `review-pr`, and `improve-review-pr` skills from this canonical repo with `npx skills add`.
 2. Installs `write-product-spec`, `write-tech-spec`, and `validate-changes-match-specs` from `warpdotdev/common-skills`.
 3. Copies the workflow templates from `templates/github/workflows/` into `.github/workflows/` in the consuming repository.
 
@@ -83,7 +95,7 @@ The installed workflows expect a `WARP_API_KEY` GitHub Actions secret.
 If you only want to install the skills without copying workflows, run:
 
 ```bash
-npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill spec --skill implementation --agent warp --yes
+npx skills add warpdotdev-demos/cloud-factory-demo --skill triage --skill spec --skill implementation --skill review-pr --skill improve-review-pr --agent warp --yes
 npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --skill validate-changes-match-specs --agent warp --yes
 ```
 
