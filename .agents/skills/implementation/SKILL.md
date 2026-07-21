@@ -1,6 +1,6 @@
 ---
 name: implementation
-description: Implement a fix or feature from a GitHub, Jira, Linear, or other issue-tracker issue by fetching issue context, inspecting the current codebase, making code changes, validating them, opening a GitHub pull request, and reporting progress back to the original issue.
+description: Implement a fix or feature from a GitHub, Jira, Linear, or other issue-tracker issue by fetching issue context, inspecting the current codebase, making code changes, validating them, optionally verifying visible behavior with the verify-behavior computer-use skill, opening a GitHub pull request, and reporting progress back to the original issue.
 ---
 
 # Implementation
@@ -17,11 +17,13 @@ Extract the issue URL, key, or number from the prompt. Determine whether it belo
 
 Confirm the current checkout is the repository where the implementation should happen. If the prompt does not identify one issue unambiguously, ask for clarification before making changes.
 
-### 2. Verify optional spec-validation skill
+### 2. Verify optional helper skills
 
 If the checkout contains `.agents/skills/validate-changes-match-specs/SKILL.md`, use it after implementation whenever `PRODUCT.md` and `TECH.md` specs exist for the issue.
 
 If specs exist but the validation skill is missing, continue only if you can still manually compare the implementation against the specs. Report that the common validation skill was unavailable in the PR description and issue comment.
+
+If the checkout contains `.agents/skills/verify-behavior/SKILL.md`, use it as a cloud computer-use **subagent** when the issue has visible UI or interactive behavior worth proving. Prefer that skill over driving the GUI yourself.
 
 ### 3. Post an implementation-started status comment
 
@@ -123,7 +125,21 @@ If `PRODUCT.md` and `TECH.md` specs exist for the issue, validate the completed 
 
 Include the spec-alignment result in the PR description and final issue comment.
 
-### 9. Create a branch and pull request
+### 9. Verify visible behavior with verify-behavior
+
+When the change affects UI, browser, desktop, or other interactive behavior, and `.agents/skills/verify-behavior/SKILL.md` is present:
+
+1. Read that skill and follow its parent workflow in `verify` mode. This covers greenfield features and bug fixes alike.
+2. If `PRODUCT.md` exists for the issue, pass its path and treat it as the source of user stories and acceptance criteria verification must exercise.
+3. For multi-story features, expect `verify-behavior` to **fan out parallel computer-use (or isolated browser) subagents per key user story** via orchestration, then aggregate results. Do not require a single serial walkthrough when stories are independent.
+4. Launch verification against the implementation branch (or the commit about to be pushed).
+5. Prefer **video** of each critical path; add screenshots for keyframes or static visual checks.
+6. If verification fails because of your change, fix the implementation and re-run verification when practical before opening the PR.
+7. If verification is blocked (missing display, secrets, flaky environment), record the blocker and continue with automated tests plus an explicit verification gap in the PR.
+
+Skip this step for non-visual changes, when the skill is missing, or when the repository has no runnable UI in the available environment. Do not claim end-to-end behavioral verification unless verify-behavior ran or you captured equivalent evidence.
+
+### 10. Create a branch and pull request
 
 Create a descriptive branch for the implementation, such as `fix/issue-123-short-title` or `feature/issue-123-short-title`.
 
@@ -140,6 +156,7 @@ The PR description should include:
 - Summary of the change
 - Validation commands run and their results
 - Spec-alignment validation results, if specs exist
+- Behavior verification results from `verify-behavior` when it ran, including status, Oz run link, and video/screenshot evidence references
 - Known limitations, follow-up work, or validation gaps
 
 Associate the PR with the issue in GitHub:
@@ -149,7 +166,7 @@ Associate the PR with the issue in GitHub:
 
 After creating the PR, verify that you have a real PR URL. If `gh pr create` fails, do not post a success comment. Instead, fix the failure if possible, or post a blocker comment explaining that the implementation branch exists but PR creation failed.
 
-### 10. Post the PR link and final status to the issue
+### 11. Post the PR link and final status to the issue
 
 Only after opening the PR, post a final comment on the original issue with:
 
@@ -157,6 +174,7 @@ Only after opening the PR, post a final comment on the original issue with:
 - Brief summary of what was implemented
 - Validation performed
 - Spec-alignment validation result, if specs exist
+- Behavior verification summary and evidence links, if `verify-behavior` ran
 - Any known limitations or reviewer notes
 
 The final issue comment must include the PR URL. A comment that says implementation is complete or that a PR will be opened later is not acceptable.
@@ -173,5 +191,6 @@ If no PR was created, post why implementation did not proceed and what concrete 
 - Do not ignore `PRODUCT.md` or `TECH.md` when they exist for the issue.
 - Do not claim validation passed if it was not run or failed.
 - Do not claim spec alignment if `validate-changes-match-specs` was not run or an equivalent manual comparison was not performed.
+- Do not claim interactive behavior was verified unless `verify-behavior` (or equivalent computer-use evidence) was collected.
 - Do not post a final success comment unless a pull request has already been opened and the comment includes the PR URL.
 - Post progress sparingly: always post the implementation-started comment, then post at most two additional progress comments before the final PR link unless blocked or explicitly asked for more updates.

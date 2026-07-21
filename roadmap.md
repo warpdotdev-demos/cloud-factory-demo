@@ -99,7 +99,7 @@ Possible work includes:
 - Example roadmap and vision documents that guide triage decisions.
 - Spec artifacts under `specs/<issue-slug>/PRODUCT.md` and `specs/<issue-slug>/TECH.md`.
 - Clear pull request descriptions and validation notes from implementation agents.
-- Review and verification patterns that show humans staying in the loop.
+- Review and verification patterns that show humans staying in the loop, including `verify-behavior` computer-use subagents that capture video or screenshots when reproducing bugs or verifying fixes.
 
 This area should improve the demo software factory itself, but changes should still relate to building or operating the example image editor.
 

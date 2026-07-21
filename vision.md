@@ -23,6 +23,7 @@ This repository is also an example app for demonstrating a cloud software factor
 - Route simple, well-scoped issues directly to implementation.
 - Route larger or ambiguous features into product and technical specs.
 - Produce pull requests that humans can review instead of merging automatically.
+- Verify visible product behavior with Oz computer-use subagents that capture video or screenshot evidence.
 - Keep the product small enough that the factory flow is easy to explain, observe, and trust.
 
 The ideal issue for this app is not just technically possible; it should make the text-based image editing experience simpler, faster, more reliable, or easier to understand.

@@ -1,6 +1,6 @@
 ---
 name: review-pr
-description: Review a pull request diff and write structured feedback to review.json for the workflow to publish. Use when reviewing a checked-out PR from local artifacts like pr_diff.txt and pr_description.txt and producing machine-readable review output instead of posting directly to GitHub.
+description: Review a pull request diff and write structured feedback to review.json for the workflow to publish. Use when reviewing a checked-out PR from local artifacts like pr_diff.txt and pr_description.txt and producing machine-readable review output instead of posting directly to GitHub. For interactive or UI behavior that a diff cannot prove, optionally invoke the verify-behavior skill as a cloud computer-use subagent and fold its findings into the same review.json.
 ---
 
 # Review PR
@@ -30,6 +30,7 @@ This skill is repository-agnostic. It works for any GitHub repository that can s
 - When `spec_context.md` exists, compare the implementation against the product and tech commitments in that file. Treat material spec drift as a review concern.
 - If the consuming repository provides a local `check-impl-against-spec` skill, use it when `spec_context.md` exists and fold its findings into the same `review.json`.
 - If the consuming repository provides a local `security-review-pr` companion skill or the prompt requests a security pass, apply it as supplemental guidance and fold any security findings into the same `review.json` rather than emitting a separate output.
+- If the PR changes visible UI or interactive behavior and `.agents/skills/verify-behavior/SKILL.md` exists, optionally read that skill and launch it in `verify` mode against the PR head (features and fixes). For multi-story features, allow parallel story fan-out as that skill describes. Prefer video evidence. Fold material verification failures into `review.json` as important or critical findings, and summarize successful verification briefly in top-level `body`. Skip when the diff is non-visual, the skill is missing, or verification would not change the review outcome.
 - Include style or nit comments only when you can provide a concrete suggestion block.
 - If a concern involves untouched code, mention it in top-level `body` instead of an inline comment.
 - Only suggest new tests when they exercise a distinct code path or edge case. Do not suggest tests that only vary constructor inputs or struct fields when existing coverage already exercises the meaningful behavior.
