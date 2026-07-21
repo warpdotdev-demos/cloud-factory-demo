@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related open issues, then return a structured decision with exactly one implementation-readiness state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt.
+description: Triage an incoming GitHub, Jira, Linear, or other issue-tracker issue against the current codebase and related open issues, then return a structured decision with exactly one implementation-readiness state. Use whenever the user asks to triage, classify, assess, prioritize, or label an issue for implementation readiness, especially when an issue URL, key, or number is supplied in the prompt. For UI or interactive bugs, optionally invoke the verify-behavior skill as a cloud computer-use subagent to reproduce the issue before deciding.
 ---
 
 # Triage
@@ -14,7 +14,7 @@ Assess the issue passed in the user's prompt and decide exactly one implementati
 
 The goal is to route work honestly, not to make every issue appear actionable. Base the decision on evidence from the issue tracker, current checkout, and related open issues.
 
-This is a read-only analysis: inspect the issue and codebase but do not mutate the tracker. Return the structured decision described in step 5; the caller applies the label and comment.
+This is a read-only analysis: inspect the issue and codebase but do not mutate the tracker. Return the structured decision described in step 6; the caller applies the label and comment.
 
 ## Workflow
 
@@ -61,7 +61,18 @@ Assess:
 
 Prefer targeted searches and reads. This is triage, not implementation: do not edit product code.
 
-### 4. Choose one state
+### 4. Optionally reproduce visible bugs with verify-behavior
+
+When the issue is a UI, browser, desktop, rendering, layout, or other interactive bug, and visual reproduction would materially improve the readiness decision, use the factory verification skill:
+
+1. If `.agents/skills/verify-behavior/SKILL.md` exists, read it and follow its parent workflow in `reproduce` mode.
+2. Launch the verification work as an Oz cloud computer-use **subagent** (do not drive the GUI yourself unless the user explicitly asks).
+3. Prefer video evidence of the repro path; accept screenshots when they are clearer or video is unavailable.
+4. Fold the reproduction status into your rationale. Confirmed repro strengthens `Ready to implement` or `Ready to spec` when the rest of the rubric fits. Failed or blocked repro often supports `Needs info` when steps or environment details are missing.
+
+Skip this step for non-visual issues, when the skill file is missing, or when computer-use verification is clearly unnecessary overhead for a trivial, already well-specified bug. Never block forever on verification: if the subagent is blocked, record that and continue with the best evidence-based state.
+
+### 5. Choose one state
 
 Use the following rubric. When evidence sits between states, choose the more cautious state.
 
@@ -112,7 +123,7 @@ Choose when:
 
 Explain what would need to change before reconsidering it. Do not use this state merely because an issue is difficult; complex but cohesive work is usually `Ready to spec`.
 
-### 5. Return the result
+### 6. Return the result
 
 Pick the tracker label that matches the chosen state, preferring an existing label with the same meaning and the tracker's established naming and casing (for example `ready-to-implement` for `Ready to implement`). List any existing triage-state labels that should be removed.
 
@@ -127,12 +138,13 @@ Return a single raw JSON object as your final response — no prose and no markd
 }
 ```
 
-Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. If verify-behavior ran, include a short reproduction status and any Oz run or evidence links that are safe to share. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 
 - Do not mutate the tracker: no comments, labels, status, assignment, or other changes. Return the structured result instead.
 - Do not implement the issue during triage or edit product code.
 - Do not classify an issue without checking both the tracker context and the current codebase.
+- When visual reproduction would help and `verify-behavior` is installed, prefer launching it as a cloud computer-use subagent over ad-hoc local clicking.
 - Do not put raw secrets, tokens, private environment variables, command output dumps, or internal reasoning in the result.
 - Treat comments from maintainers and linked product/spec documents as stronger evidence than guesses from code alone.

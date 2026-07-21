@@ -19,7 +19,7 @@ fi
 
 # Keep npx from consuming the rest of this script when users install with
 # `curl ... | bash`.
-npx skills add "${REPO}" --skill triage --skill spec --skill implementation --skill review-pr --skill improve-review-pr --agent warp --yes < /dev/null
+npx skills add "${REPO}" --skill triage --skill spec --skill implementation --skill verify-behavior --skill review-pr --skill improve-review-pr --agent warp --yes < /dev/null
 npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --skill validate-changes-match-specs --agent warp --yes < /dev/null
 
 mkdir -p .github/workflows

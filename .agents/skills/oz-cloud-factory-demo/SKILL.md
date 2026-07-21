@@ -1,6 +1,6 @@
 ---
 name: oz-cloud-factory-demo
-description: Sets up a beginner-friendly Oz cloud software factory that automatically triages new GitHub issues, specs issues labeled ready-to-spec, and implements issues labeled ready-to-implement. Use when a user wants to install, configure, test, or understand the Cloud Factory demo in a repository of their choice.
+description: Sets up a beginner-friendly Oz cloud software factory that automatically triages new GitHub issues, specs issues labeled ready-to-spec, implements issues labeled ready-to-implement, reviews PRs, and verifies visible behavior with Oz computer-use subagents. Use when a user wants to install, configure, test, or understand the Cloud Factory demo in a repository of their choice.
 ---
 
 # Oz Cloud Factory Demo
@@ -8,7 +8,7 @@ description: Sets up a beginner-friendly Oz cloud software factory that automati
 Guide a user who is new to Oz through setting up this flow in a GitHub repository:
 
 ```text
-new issue -> Oz triage -> Ready to spec label -> Oz spec -> PRODUCT.md + TECH.md PR -> Oz implementation -> pull request
+new issue -> Oz triage (+ optional verify-behavior reproduce) -> Ready to spec label -> Oz spec -> PRODUCT.md + TECH.md PR -> Oz implementation (+ optional verify-behavior verify, with parallel story fan-out for features) -> pull request -> Oz review (+ optional verify-behavior)
 ```
 
 Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-demo`. Explain each action before taking it, keep secrets out of output and files, and stop at explicit activation checkpoints.
@@ -17,7 +17,7 @@ Use the canonical installer and workflows from `warpdotdev-demos/cloud-factory-d
 
 The setup is complete when:
 
-- The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, `validate-changes-match-specs`, and `implementation` skills.
+- The target repository contains the `triage`, `spec`, `write-product-spec`, `write-tech-spec`, `validate-changes-match-specs`, `implementation`, and `verify-behavior` skills.
 - The target repository contains the three Cloud Factory GitHub workflows.
 - The repository has an Oz API key stored as the `WARP_API_KEY` Actions secret. A team key is preferred for shared automation, but a personal key is supported and may be necessary when creating keys through the Oz CLI.
 - If using a team key, the Warp team has team GitHub authorization configured so implementation runs can push branches and open pull requests. If using a personal key, runs authenticate as that user and use that user's GitHub permissions.
@@ -33,8 +33,9 @@ The setup is complete when:
 - **GitHub Actions** provides the event triggers and repository checkout for this demo.
 - **Triage** classifies each new issue as `Ready to implement`, `Ready to spec`, `Needs info`, or `Wait to implement`.
 - The triage workflow runs the agent **read-only**: a first job grants the agent only `contents: read` and `issues: read` and has it emit a structured JSON result, and a second deterministic `apply` job (`issues: write`) applies the label and comment to the triggering issue only. The agent never holds issue-write access, so it cannot modify other issues.
+- **Verification (`verify-behavior`)** is a shared skill other stages invoke as Oz cloud subagent work. It chooses **browser use** (Chrome + Puppeteer MCP) for most web flows or **computer use** for native apps and multi-surface journeys. Triage can use it in `reproduce` mode for UI bugs; implementation and review can use it in `verify` mode for greenfield features and fixes. When `PRODUCT.md` defines multiple user stories, feature verification defaults to **parallel story fan-out** with computer-use-capable workers. Default evidence is video of each critical path, with screenshots as keyframes or fallbacks.
 - **Spec** runs when the issue receives a ready-to-spec label, delegates spec content to the common `write-product-spec` and `write-tech-spec` skills, and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
-- **Implementation** runs only when the issue receives a ready-to-implement label. If `PRODUCT.md` and `TECH.md` specs exist, it reads them first and uses `validate-changes-match-specs` to check the completed diff against the specs before opening a PR.
+- **Implementation** runs only when the issue receives a ready-to-implement label. If `PRODUCT.md` and `TECH.md` specs exist, it reads them first and uses `validate-changes-match-specs` to check the completed diff against the specs before opening a PR. For visible UI features or fixes it should also invoke `verify-behavior` in `verify` mode when cloud verification is available.
 - The implementation workflow has permission to create branches and pull requests. It does not merge them.
 
 ## Workflow
@@ -70,6 +71,7 @@ Inspect the local checkout for:
 - `.agents/skills/write-tech-spec/SKILL.md`
 - `.agents/skills/validate-changes-match-specs/SKILL.md`
 - `.agents/skills/implementation/SKILL.md`
+- `.agents/skills/verify-behavior/SKILL.md`
 - `.github/workflows/triage-issues.yml`
 - `.github/workflows/spec-ready-issues.yml`
 - `.github/workflows/implement-ready-issues.yml`
@@ -215,6 +217,7 @@ The installer should add:
 - `.agents/skills/write-tech-spec/SKILL.md`
 - `.agents/skills/validate-changes-match-specs/SKILL.md`
 - `.agents/skills/implementation/SKILL.md`
+- `.agents/skills/verify-behavior/SKILL.md`
 - `.github/workflows/triage-issues.yml`
 - `.github/workflows/spec-ready-issues.yml`
 - `.github/workflows/implement-ready-issues.yml`
@@ -242,6 +245,8 @@ Review the resulting diff. Explain:
 - `triage-issues.yml` triggers when an issue is opened.
 - `spec-ready-issues.yml` triggers when an issue receives a ready-to-spec label and opens a specs PR containing `PRODUCT.md` and `TECH.md`.
 - `implement-ready-issues.yml` triggers when an issue receives a ready-to-implement label and validates the completed implementation against `PRODUCT.md` and `TECH.md` when specs exist.
+- `verify-behavior` is not a separate GitHub workflow. Parent agents (triage, implementation, review) invoke it as a cloud subagent when visual evidence helps.
+- Explain that verification children choose browser use (Chrome/Puppeteer MCP) vs computer use based on the app surface, that computer use runs only in Oz cloud sandboxes and is opt-in for the account/team, and that children should capture video by default.
 - The workflows use `warpdotdev/oz-agent-action@v1`.
 - GitHub's token supplies repository permissions; `WARP_API_KEY` authenticates Oz.
 
