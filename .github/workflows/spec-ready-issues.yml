@@ -59,9 +59,11 @@ jobs:
 
             Create a specs branch, commit the spec files, push the branch, and
             open a GitHub pull request for review. Post status comments as
-            directed by the skill, using only an Oz run or Oz session URL as
-            the follow-along link. Do not use the GitHub Actions workflow URL
-            as the follow-along link.
+            directed by the skill. For Oz follow-along links use only
+            `https://oz.warp.dev/runs/<run-id>` (or
+            `https://oz.staging.warp.dev/runs/<run-id>` on staging). Never post
+            `app.warp.dev` links or `/run/` (singular) paths, and never use the
+            GitHub Actions workflow URL as the follow-along link.
 
             Do not implement the issue. Do not apply `Ready to implement`
             until the specs PR has been reviewed or the repository explicitly

@@ -138,7 +138,7 @@ Return a single raw JSON object as your final response — no prose and no markd
 }
 ```
 
-Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. If verify-behavior ran, include a short reproduction status and any Oz run or evidence links that are safe to share. Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
+Write `comment` as reporter-facing markdown: a short lead sentence with the decision, then the evidence-based rationale and one concrete next step, using a brief bullet list where it aids readability. If verify-behavior ran, include a short reproduction status and any Oz run or evidence links that are safe to share. Oz run links must use `https://oz.warp.dev/runs/<run-id>` (or `https://oz.staging.warp.dev/runs/<run-id>` on staging) — never `app.warp.dev` or `/run/` (singular). Because `comment` is a JSON string, encode every line break as `\n` (a literal newline would make the JSON invalid).
 
 ## Guardrails
 

@@ -39,11 +39,34 @@ Use the authenticated `gh` CLI when available. Include:
 
 - That automated Oz spec work has started.
 - That the output will be checked-in `PRODUCT.md` and `TECH.md` files.
-- A follow-along link to the Oz run or Oz session.
-
-Use an Oz run URL or Oz session URL from the agent runtime, action output, environment, or logs. Do not use a GitHub Actions workflow URL as the follow-along link. If no Oz run or session link is available yet, say that the Oz follow-along link is not available yet rather than substituting another URL, and continue spec work.
+- A follow-along link to the Oz run (see **Oz run URLs** below).
 
 Keep this comment concise.
+
+### Oz run URLs
+
+When posting any follow-along or status link to an Oz cloud run, use the **Oz web app** URL — never invent links from the API host.
+
+Correct format:
+
+```text
+https://oz.warp.dev/runs/<run-id>
+```
+
+On staging / WarpDev, use:
+
+```text
+https://oz.staging.warp.dev/runs/<run-id>
+```
+
+Rules:
+
+- Path is **`/runs/`** (plural), never `/run/`.
+- Host is **`oz.warp.dev`** (or `oz.staging.warp.dev`), never `app.warp.dev` or `app.staging.warp.dev`.
+- Prefer a full run URL already provided by the runtime, action output, dispatcher, or logs. If you only have a run id, build the URL with the format above.
+- If you see `https://app.warp.dev/run/<id>` or `https://app.warp.dev/runs/<id>`, rewrite it to `https://oz.warp.dev/runs/<id>` before posting.
+- Do not use a GitHub Actions workflow run URL as the Oz follow-along link.
+- If no Oz run id or link is available yet, say the Oz follow-along link is not available yet rather than substituting another URL, and continue spec work.
 
 ### 4. Fetch tracker context
 
