@@ -88,11 +88,7 @@ def _run_gh_json(args: list[str]) -> Any:
 
 
 def _paginate(path: str, params: list[str] | None = None) -> list[Any]:
-    args = ["--paginate", path]
-    if params:
-        for item in params:
-            args.extend(["-f", item] if "=" in item and not item.startswith("per_page") else ["-F", item])
-    # Prefer query string construction for simple GETs.
+    # Use query string construction for simple GETs.
     if params:
         query = "&".join(params)
         path_with_query = f"{path}?{query}"
