@@ -76,7 +76,7 @@ jobs:
           if-no-files-found: error
 
       - name: Improve review skill with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
+        uses: warpdotdev/oz-agent-action@v1.0.25
         env:
           GH_TOKEN: ${{ github.token }}
         with:

@@ -106,7 +106,7 @@ jobs:
           if-no-files-found: error
 
       - name: Review with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
+        uses: warpdotdev/oz-agent-action@v1.0.25
         id: review
         env:
           GH_TOKEN: ${{ github.token }}

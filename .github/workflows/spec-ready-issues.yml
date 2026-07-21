@@ -32,7 +32,7 @@ jobs:
         run: npx skills add warpdotdev/common-skills --skill write-product-spec --skill write-tech-spec --agent warp --yes
 
       - name: Spec issue with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
+        uses: warpdotdev/oz-agent-action@v1.0.25
         id: spec
         env:
           # Authenticates the `gh` CLI the agent uses for issues and labels.
@@ -70,3 +70,4 @@ jobs:
             treats authored specs as implementation-ready without review.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+          cloud: true

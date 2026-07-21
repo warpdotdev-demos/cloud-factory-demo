@@ -70,7 +70,7 @@ When the issue is a UI, browser, desktop, rendering, layout, or other interactiv
 3. Prefer video evidence of the repro path; accept screenshots when they are clearer or video is unavailable.
 4. Fold the reproduction status into your rationale. Confirmed repro strengthens `Ready to implement` or `Ready to spec` when the rest of the rubric fits. Failed or blocked repro often supports `Needs info` when steps or environment details are missing.
 
-Skip this step for non-visual issues, when the skill file is missing, or when computer-use verification is clearly unnecessary overhead for a trivial, already well-specified bug. Never block forever on verification: if the subagent is blocked, record that and continue with the best evidence-based state.
+Skip this step for non-visual issues or when the skill file is missing. When the issue text asks for visual reproduction, screenshots, video, computer use, browser use, or `verify-behavior`, treat reproduction as required rather than optional. Never block forever on verification: if the subagent is blocked, record that and continue with the best evidence-based state. Launch reproduction children with computer use enabled when the surface needs it.
 
 ### 5. Choose one state
 
