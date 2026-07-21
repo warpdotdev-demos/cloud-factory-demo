@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Triage with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
+        uses: warpdotdev/oz-agent-action@v1.0.25
         id: triage
         env:
           GH_TOKEN: ${{ github.token }}
@@ -51,11 +51,19 @@ jobs:
             checked-out codebase, then choose exactly one
             implementation-readiness state.
 
+            If the issue is a UI/interactive bug (or mentions screenshots, video,
+            computer use, browser use, drag-and-drop, or verify-behavior), optionally
+            invoke `.agents/skills/verify-behavior` in `reproduce` mode with computer
+            use enabled before deciding. Prefer visual evidence when it materially
+            improves the readiness decision.
+
             Return the JSON result the skill specifies as your final response;
             the apply job applies the label and comment from it. Do not comment
             on, label, or otherwise mutate the issue directly from this job.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+          cloud: true
+          computer_use: true
 
   apply:
     name: Apply triage result

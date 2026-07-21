@@ -31,7 +31,7 @@ jobs:
         run: npx skills add warpdotdev/common-skills --skill validate-changes-match-specs --agent warp --yes
 
       - name: Implement issue with Oz agent
-        uses: warpdotdev/oz-agent-action@v1
+        uses: warpdotdev/oz-agent-action@v1.0.25
         id: implement
         env:
           # Authenticates the `gh` CLI the agent uses for issues, branches, and PRs.
@@ -51,19 +51,33 @@ jobs:
             Fetch the full issue and comments with the authenticated `gh` CLI,
             find and read any linked or checked-in `PRODUCT.md` and `TECH.md`
             specs before inspecting implementation areas, inspect this checked-out
-            codebase, implement the smallest cohesive fix or feature, validate it,
-            and if specs exist, read and follow
+            codebase, implement the smallest cohesive fix or feature, and validate
+            it. If specs exist, read and follow
             `.agents/skills/validate-changes-match-specs/SKILL.md` to confirm the
-            implementation matches those specs. Then create a branch, push it,
-            and open a GitHub pull request. Post implementation progress comments
-            to the original issue as directed by the skill. For Oz follow-along
-            links use only `https://oz.warp.dev/runs/<run-id>` (or
+            implementation matches those specs.
+
+            If the issue has visible UI / interactive behavior (including anything
+            mentioning drag-and-drop, screenshots, video, browser use, computer
+            use, or verify-behavior), you MUST run
+            `.agents/skills/verify-behavior/SKILL.md` in `verify` mode after the
+            code change, with computer use enabled on verification child runs.
+            Capture video/screenshot evidence before claiming success. Do not skip
+            verification because unit tests passed or because PR creation failed.
+
+            Then create a branch, push it, and open a GitHub pull request. Post
+            implementation progress comments to the original issue as directed by
+            the skill. For Oz follow-along links use only
+            `https://oz.warp.dev/runs/<run-id>` (or
             `https://oz.staging.warp.dev/runs/<run-id>` on staging). Never post
             `app.warp.dev` links or `/run/` (singular) paths, and never use the
             GitHub Actions workflow URL as the follow-along link. Do not post a
-            final success comment until the pull request has been opened. The
-            final issue comment must include the PR URL, and the PR body must
-            link to this issue using `Closes #${{ github.event.issue.number }}`
-            when the implementation fully resolves it.
+            final success comment until the pull request has been opened (if PR
+            creation is blocked, still post verification results and the branch
+            compare URL). The final issue comment must include the PR URL when
+            available, and the PR body must link to this issue using
+            `Closes #${{ github.event.issue.number }}` when the implementation
+            fully resolves it.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}
+          cloud: true
+          computer_use: true

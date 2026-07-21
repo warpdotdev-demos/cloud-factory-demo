@@ -1,6 +1,6 @@
 ---
 name: implementation
-description: Implement a fix or feature from a GitHub, Jira, Linear, or other issue-tracker issue by fetching issue context, inspecting the current codebase, making code changes, validating them, optionally verifying visible behavior with the verify-behavior computer-use skill, opening a GitHub pull request, and reporting progress back to the original issue.
+description: Implement a fix or feature from a GitHub, Jira, Linear, or other issue-tracker issue by fetching issue context, inspecting the current codebase, making code changes, validating them, verifying visible UI behavior with the verify-behavior computer-use skill when applicable, opening a GitHub pull request, and reporting progress back to the original issue.
 ---
 
 # Implementation
@@ -23,7 +23,7 @@ If the checkout contains `.agents/skills/validate-changes-match-specs/SKILL.md`,
 
 If specs exist but the validation skill is missing, continue only if you can still manually compare the implementation against the specs. Report that the common validation skill was unavailable in the PR description and issue comment.
 
-If the checkout contains `.agents/skills/verify-behavior/SKILL.md`, use it as a cloud computer-use **subagent** when the issue has visible UI or interactive behavior worth proving. Prefer that skill over driving the GUI yourself.
+If the checkout contains `.agents/skills/verify-behavior/SKILL.md` and the issue has visible UI, browser, desktop, mobile, or other interactive behavior, you **must** run that skill as a cloud computer-use / browser-use **subagent** before claiming the implementation is complete. Prefer that skill over driving the GUI yourself. Do not skip verification because PR creation failed or because automated unit tests passed.
 
 ### 3. Post an implementation-started status comment
 
@@ -150,17 +150,18 @@ Include the spec-alignment result in the PR description and final issue comment.
 
 ### 9. Verify visible behavior with verify-behavior
 
-When the change affects UI, browser, desktop, or other interactive behavior, and `.agents/skills/verify-behavior/SKILL.md` is present:
+**Required** when the change affects UI, browser, desktop, mobile, or other interactive behavior and `.agents/skills/verify-behavior/SKILL.md` is present. Issue text that mentions drag-and-drop, screenshots, video, computer use, browser use, or `verify-behavior` is always treated as interactive.
 
 1. Read that skill and follow its parent workflow in `verify` mode. This covers greenfield features and bug fixes alike.
 2. If `PRODUCT.md` exists for the issue, pass its path and treat it as the source of user stories and acceptance criteria verification must exercise.
-3. For multi-story features, expect `verify-behavior` to **fan out parallel computer-use (or isolated browser) subagents per key user story** via orchestration, then aggregate results. Do not require a single serial walkthrough when stories are independent.
-4. Launch verification against the implementation branch (or the commit about to be pushed).
+3. For multi-story features, **fan out parallel computer-use (or isolated browser) subagents per key user story** via orchestration, then aggregate results.
+4. Launch verification against the implementation branch (or the commit about to be pushed) with computer use enabled on the verification child runs (`remote.computer_use_enabled: true` / `oz agent run-cloud --computer-use`).
 5. Prefer **video** of each critical path; add screenshots for keyframes or static visual checks.
-6. If verification fails because of your change, fix the implementation and re-run verification when practical before opening the PR.
-7. If verification is blocked (missing display, secrets, flaky environment), record the blocker and continue with automated tests plus an explicit verification gap in the PR.
+6. If verification fails because of your change, fix the implementation and re-run verification before opening the PR when practical.
+7. If verification is blocked (missing display, secrets, flaky environment, computer use unavailable), post an explicit verification-gap comment with the blocker. Still do not claim behavioral verification passed.
+8. Do **not** skip this step because PR creation failed. Verification is independent of opening the PR.
 
-Skip this step for non-visual changes, when the skill is missing, or when the repository has no runnable UI in the available environment. Do not claim end-to-end behavioral verification unless verify-behavior ran or you captured equivalent evidence.
+Skip this step only for non-visual changes, when the skill file is missing, or when the repository truly has no runnable UI. Do not claim end-to-end behavioral verification unless verify-behavior ran or you captured equivalent computer-use/browser evidence.
 
 ### 10. Create a branch and pull request
 
@@ -214,6 +215,7 @@ If no PR was created, post why implementation did not proceed and what concrete 
 - Do not ignore `PRODUCT.md` or `TECH.md` when they exist for the issue.
 - Do not claim validation passed if it was not run or failed.
 - Do not claim spec alignment if `validate-changes-match-specs` was not run or an equivalent manual comparison was not performed.
-- Do not claim interactive behavior was verified unless `verify-behavior` (or equivalent computer-use evidence) was collected.
-- Do not post a final success comment unless a pull request has already been opened and the comment includes the PR URL.
+- Do not claim interactive behavior was verified unless `verify-behavior` (or equivalent computer-use/browser evidence) was collected.
+- For interactive/UI issues, do not treat the implementation as complete until `verify-behavior` has been attempted (pass or explicit blocker).
+- Do not post a final success comment unless a pull request has already been opened and the comment includes the PR URL. If PR creation is blocked, still report verification results on the issue.
 - Post progress sparingly: always post the implementation-started comment, then post at most two additional progress comments before the final PR link unless blocked or explicitly asked for more updates.
