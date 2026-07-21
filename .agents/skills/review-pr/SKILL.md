@@ -36,6 +36,8 @@ This skill is repository-agnostic. It works for any GitHub repository that can s
 - Only suggest new tests when they exercise a distinct code path or edge case. Do not suggest tests that only vary constructor inputs or struct fields when existing coverage already exercises the meaningful behavior.
 - When a PR is clearly a V0 or initial implementation, frame robustness suggestions such as timeouts, retries, and lifecycle management as optional future work rather than blocking concerns, unless they risk correctness, security, or data loss.
 - For documentation-only or specs-only PRs, focus on clarity, completeness, contradictions, and missing acceptance criteria rather than production-code concerns.
+- Flag outbound network or subprocess calls that omit timeouts or other hang protection, especially in CI scripts, GitHub Actions helpers, and review tooling. Prefer concrete timeout suggestions over generic robustness nits.
+- Prefer structural fixes over comment-only guidance. For example, if a path traversal uses a magic parent index, suggest parsing the path into a named object or helper with explicit field access rather than only documenting the index.
 
 ## Repository-specific guidance
 
