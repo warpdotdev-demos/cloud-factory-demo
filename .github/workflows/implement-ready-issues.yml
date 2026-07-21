@@ -56,12 +56,14 @@ jobs:
             `.agents/skills/validate-changes-match-specs/SKILL.md` to confirm the
             implementation matches those specs. Then create a branch, push it,
             and open a GitHub pull request. Post implementation progress comments
-            to the original issue as directed by the skill, using only an Oz run
-            or Oz session URL as the follow-along link. Do not use the GitHub
-            Actions workflow URL as the follow-along link. Do not post a final
-            success comment until the pull request has been opened. The final
-            issue comment must include the PR URL, and the PR body must link to
-            this issue using `Closes #${{ github.event.issue.number }}` when
-            the implementation fully resolves it.
+            to the original issue as directed by the skill. For Oz follow-along
+            links use only `https://oz.warp.dev/runs/<run-id>` (or
+            `https://oz.staging.warp.dev/runs/<run-id>` on staging). Never post
+            `app.warp.dev` links or `/run/` (singular) paths, and never use the
+            GitHub Actions workflow URL as the follow-along link. Do not post a
+            final success comment until the pull request has been opened. The
+            final issue comment must include the PR URL, and the PR body must
+            link to this issue using `Closes #${{ github.event.issue.number }}`
+            when the implementation fully resolves it.
           warp_api_key: ${{ secrets.WARP_API_KEY }}
           profile: ${{ vars.WARP_AGENT_PROFILE || '' }}

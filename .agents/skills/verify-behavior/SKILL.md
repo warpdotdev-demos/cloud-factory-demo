@@ -133,7 +133,9 @@ Flow:
 Report:
 Verification summary: mode, work shape, channel, issue/PR, change type, PRODUCT.md, assigned story, status, branch/ref, setup, tools
 User stories covered: <item>: pass|fail|blocked|not run — note
-Steps / Evidence (video, screenshots, run link) / Findings / Next step
+Steps / Evidence (video, screenshots, Oz run link) / Findings / Next step
+
+Oz run links must use https://oz.warp.dev/runs/<run-id> (or https://oz.staging.warp.dev/runs/<run-id> on staging). Never post app.warp.dev or /run/ (singular) links.
 ```
 
 ### Mode add-ons
