@@ -47,6 +47,10 @@ def _parse_args() -> argparse.Namespace:
         help="Pull request number. Defaults to GitHub Actions context when available.",
     )
     parser.add_argument(
+        "--commit-id",
+        help="Optional pull request head SHA that the review must be attached to.",
+    )
+    parser.add_argument(
         "--skip-validation",
         action="store_true",
         help="Skip running validate_review_json.py before publishing.",
@@ -197,6 +201,8 @@ def main() -> int:
         "event": event,
         "comments": comments,
     }
+    if args.commit_id:
+        payload["commit_id"] = args.commit_id
 
     payload_path = Path("review_publish_payload.json")
 
