@@ -31,7 +31,7 @@ jobs:
         run: npx skills add warpdotdev/common-skills --skill validate-changes-match-specs --agent warp --yes
 
       - name: Implement issue with Oz agent
-        uses: warpdotdev/oz-agent-action@v1.0.25
+        uses: warpdotdev/oz-agent-action@89f7386434035ba0487f56a47c3e562fa4c60efb # v1.0.25
         id: implement
         env:
           # Authenticates the `gh` CLI the agent uses for issues, branches, and PRs.
